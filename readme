@@ -1,0 +1,4 @@
+BWT implementation based on http://link.springer.com/chapter/10.1007%2F978-3-319-02432-5_5
+
+mingw on windows:
+g++ src/bwt.cpp src/main.cpp -std=c++11 -Wall -static -static-libgcc -static-libstdc++
