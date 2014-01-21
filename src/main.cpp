@@ -3,20 +3,18 @@
 
 #include "bwt.h"
 
-bool testStep1(const char* text, size_t textlen, const std::vector<size_t>& wantedResult)
+void testEqualityAndWhine(const char* step, const char* text, size_t textlen, const std::vector<size_t>& result, const std::vector<size_t>& wanted)
 {
-	std::vector<size_t> result = step1(text, textlen);
-	if (std::equal(result.begin(), result.end(), wantedResult.begin()))
+	if (std::equal(result.begin(), result.end(), wanted.begin()))
 	{
-		std::cout << "step 1 equal\n";
-		return true;
+		std::cout << step << " equal\n";
 	}
 	else
 	{
-		std::cout << "step 1 NOT EQUAL\n";
+		std::cout << step << " NOT EQUAL\n";
 		std::cout << text << " " << textlen << "\n";
 		std::cout << "wanted: ";
-		for (auto i = wantedResult.begin(); i != wantedResult.end(); i++)
+		for (auto i = wanted.begin(); i != wanted.end(); i++)
 		{
 			std::cout << *i << " ";
 		}
@@ -27,36 +25,25 @@ bool testStep1(const char* text, size_t textlen, const std::vector<size_t>& want
 			std::cout << *i << " ";
 		}
 		std::cout << "\n";
-		return false;
 	}
 }
 
-bool testStep2(const char* text, size_t textlen, const std::vector<size_t>& step1result, const std::vector<size_t>& wantedResult)
+void testStep1(const char* text, size_t textlen, const std::vector<size_t>& wantedResult)
+{
+	std::vector<size_t> result = step1(text, textlen);
+	testEqualityAndWhine("step 1", text, textlen, result, wantedResult);
+}
+
+void testStep2(const char* text, size_t textlen, const std::vector<size_t>& step1result, const std::vector<size_t>& wantedResult)
 {
 	std::vector<size_t> result = step2(text, textlen, step1result);
-	if (std::equal(result.begin(), result.end(), wantedResult.begin()))
-	{
-		std::cout << "step 2 equal\n";
-		return true;
-	}
-	else
-	{
-		std::cout << "step 2 NOT EQUAL\n";
-		std::cout << text << " " << textlen << "\n";
-		std::cout << "wanted: ";
-		for (auto i = wantedResult.begin(); i != wantedResult.end(); i++)
-		{
-			std::cout << *i << " ";
-		}
-		std::cout << "\n";
-		std::cout << "result: ";
-		for (auto i = result.begin(); i != result.end(); i++)
-		{
-			std::cout << *i << " ";
-		}
-		std::cout << "\n";
-		return false;
-	}
+	testEqualityAndWhine("step 2", text, textlen, result, wantedResult);
+}
+
+void testStep3(const char* text, size_t textlen, const std::vector<size_t>& step2result, const std::vector<size_t>& wantedResult)
+{
+	std::vector<size_t> result = step3(text, textlen, step2result);
+	testEqualityAndWhine("step 3", text, textlen, result, wantedResult);
 }
 
 void test()
@@ -67,6 +54,8 @@ void test()
 	testStep1("amammmasasmasassaara\0", 21, wanted);
 	std::vector<size_t> wanted2 { 1, 3, 18, 7, 12, 9, 14 };
 	testStep2("amammmasasmasassaara\0", 21, wanted, wanted2);
+	std::vector<size_t> wanted3 { 20, 16, 2, 6, 11, 8, 13 };
+	testStep3("amammmasasmasassaara\0", 21, wanted2, wanted3);
 }
 
 int main(int argc, char** argv)

@@ -13,6 +13,11 @@ std::vector<size_t> step2(const char* text, size_t textLen, const std::vector<si
 	return step2((const unsigned char*)text, textLen, LMSLeft);
 }
 
+std::vector<size_t> step3(const char* text, size_t textLen, const std::vector<size_t>& LMSRight)
+{
+	return step3((const unsigned char*)text, textLen, LMSRight);
+}
+
 //find LMS-type suffixes in text, return a vector of their indices
 std::vector<size_t> step1(const unsigned char* text, size_t textLen)
 {
@@ -46,7 +51,7 @@ std::vector<size_t> step1(const unsigned char* text, size_t textLen)
 		}
 		isSType = nextIsSType;
 	}
-	std::vector<size_t> ret;
+	std::vector<size_t> ret; //A_lms, left in paper
 	//indices were inserted in reverse order, reverse the vector to get them in right order
 	for (int i = 0; i < 256; i++)
 	{
@@ -74,11 +79,16 @@ std::vector<size_t> step2(const unsigned char* text, size_t textLen, const std::
 		for (size_t i = 0; i < buckets[bucket].size(); i++)
 		{
 			size_t j = buckets[bucket][i];
-			assert(j > 0);
-			if (text[j-1] >= text[j])
+			size_t jminus1 = j-1;
+			if (j == 0)
 			{
-				buckets[text[j-1]].push_back(j-1);
-				buckets[bucket][i] = 0; //don't erase() because erase is O(n), just mark as unused
+				jminus1 = textLen-1; //is this right?
+			}
+			assert(j <= textLen);
+			if (text[jminus1] >= text[j])
+			{
+				buckets[text[jminus1]].push_back(jminus1);
+				buckets[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
 			}
 			else
 			{
@@ -86,5 +96,43 @@ std::vector<size_t> step2(const unsigned char* text, size_t textLen, const std::
 			}
 		}
 	}
+	return ret;
+}
+
+//same as step 2 in right-to-left order, see step 2 for documentation
+std::vector<size_t> step3(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSRight)
+{
+	std::vector<size_t> buckets[256]; //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
+	std::vector<size_t> ret; //A_lms,left in paper, built in reverse order
+	auto LMSPosition = LMSRight.rbegin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
+	for (int bucket = 255; bucket >= 0; bucket--)
+	{
+		while (LMSPosition != LMSRight.rend() && text[*LMSPosition] == bucket)
+		{
+			buckets[bucket].push_back(*LMSPosition);
+			LMSPosition++;
+		}
+		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
+		for (size_t i = 0; i < buckets[bucket].size(); i++)
+		{
+			size_t j = buckets[bucket][i];
+			size_t jminus1 = j-1;
+			if (j == 0)
+			{
+				jminus1 = textLen-1; //is this right?
+			}
+			assert(j <= textLen);
+			if (text[jminus1] <= text[j])
+			{
+				buckets[text[jminus1]].push_back(jminus1);
+				buckets[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
+			}
+			else
+			{
+				ret.push_back(j);
+			}
+		}
+	}
+	std::reverse(ret.begin(), ret.end());
 	return ret;
 }
