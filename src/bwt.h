@@ -8,15 +8,16 @@
 #include <limits>
 
 template <class Alphabet>
-std::vector<size_t> charSums(const Alphabet* text, size_t textLen, Alphabet maxAlphabet)
+std::vector<size_t> charSums(const Alphabet* text, size_t textLen, size_t maxAlphabet)
 {
-	std::vector<size_t> sums(maxAlphabet, 0);
+	std::vector<size_t> sums(maxAlphabet+1, 0);
 	for (size_t i = 0; i < textLen; i++)
 	{
 		sums[text[i]]++;
 	}
-	std::vector<size_t> res(maxAlphabet, 0);
-	for (int i = 1; i < maxAlphabet; i++)
+	std::vector<size_t> res(maxAlphabet+1, 0);
+	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
+	for (int i = 1; i < maxAlphabet+1; i++)
 	{
 		res[i] = res[i-1]+sums[i-1];
 	}
@@ -28,10 +29,10 @@ extern std::vector<size_t> charSums(const unsigned char* text, size_t textLen);
 
 //find LMS-type suffixes in text, return a vector of their indices
 template <class Alphabet>
-std::vector<size_t> step1(const Alphabet* text, size_t textLen, Alphabet maxAlphabet)
+std::vector<size_t> step1(const Alphabet* text, size_t textLen, size_t maxAlphabet)
 {
 	assert(textLen > 0);
-	std::vector<size_t> buckets[maxAlphabet];
+	std::vector<size_t> buckets[maxAlphabet+1];
 	bool isSType = true; //last character is always s-type
 	bool equalIsSType = false; //if text[i] == text[i-1], is text[i-1] s-type?
 	//i > 0 because 0 can never be LMS-type
@@ -62,8 +63,8 @@ std::vector<size_t> step1(const Alphabet* text, size_t textLen, Alphabet maxAlph
 	}
 	std::vector<size_t> ret; //A_lms, left in paper
 	//indices were inserted in reverse order, reverse the vector to get them in right order
-	assert(maxAlphabet < std::numeric_limits<int>::max());
-	for (int i = 0; i < maxAlphabet; i++)
+	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
+	for (int i = 0; i < maxAlphabet+1; i++)
 	{
 		std::reverse(buckets[i].begin(), buckets[i].end());
 		ret.insert(ret.end(), buckets[i].begin(), buckets[i].end());
@@ -76,14 +77,14 @@ extern std::vector<size_t> step1(const unsigned char* text, size_t textLen);
 
 //sorts (with step 3) the LMS-type substrings
 template <class Alphabet>
-std::vector<size_t> step2(const Alphabet* text, size_t textLen, Alphabet maxAlphabet, const std::vector<size_t>& LMSLeft)
+std::vector<size_t> step2(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSLeft)
 {
-	std::vector<size_t> buckets[maxAlphabet]; //A_l in paper
+	std::vector<size_t> buckets[maxAlphabet+1]; //A_l in paper
 	std::vector<size_t> ret; //A_lms,right in paper
 	auto LMSPosition = LMSLeft.begin(); //LMSLeft is A_lms,left in paper
 	assert(LMSPosition != LMSLeft.end());
-	assert(maxAlphabet < std::numeric_limits<int>::max());
-	for (int bucket = 0; bucket < maxAlphabet; bucket++)
+	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
+	for (int bucket = 0; bucket < maxAlphabet+1; bucket++)
 	{
 		while (LMSPosition != LMSLeft.end() && text[*LMSPosition] == bucket)
 		{
@@ -119,13 +120,13 @@ extern std::vector<size_t> step2(const unsigned char* text, size_t textLen, cons
 
 //sorts (with step 3) the LMS-type substrings
 template <class Alphabet>
-std::vector<size_t> step3(const Alphabet* text, size_t textLen, Alphabet maxAlphabet, const std::vector<size_t>& LMSRight)
+std::vector<size_t> step3(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSRight)
 {
-	std::vector<size_t> buckets[maxAlphabet]; //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
+	std::vector<size_t> buckets[maxAlphabet+1]; //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
 	std::vector<size_t> ret; //A_lms,left in paper, built in reverse order
 	auto LMSPosition = LMSRight.rbegin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
-	assert(maxAlphabet-1 < std::numeric_limits<int>::max());
-	for (int bucket = maxAlphabet-1; bucket >= 0; bucket--)
+	assert(maxAlphabet < std::numeric_limits<int>::max());
+	for (int bucket = maxAlphabet; bucket >= 0; bucket--)
 	{
 		while (LMSPosition != LMSRight.rend() && text[*LMSPosition] == bucket)
 		{
@@ -187,7 +188,7 @@ bool LMSSubstringsAreEqual(const Alphabet* text, size_t textLen, size_t str1, si
 
 //return.first is S', return.second is R
 template <class Alphabet>
-std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, size_t textLen, Alphabet maxAlphabet, const std::vector<size_t>& LMSLeft)
+std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSLeft)
 {
 	std::pair<std::vector<size_t>, std::vector<size_t>> ret;
 	std::vector<bool> LMSSubstringBorder(textLen, false);
@@ -242,15 +243,15 @@ std::vector<size_t> step5(const std::vector<size_t>& Sprime);
 std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector<size_t>& R);
 
 template <class Alphabet>
-std::vector<size_t> step7(const Alphabet* text, size_t textLen, Alphabet maxAlphabet, const std::vector<size_t>& LMSLeft, unsigned char* result, const std::vector<size_t>& charSums)
+std::vector<size_t> step7(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSLeft, unsigned char* result, const std::vector<size_t>& charSums)
 {
-	std::vector<size_t> buckets[maxAlphabet]; //A_l in paper
+	std::vector<size_t> buckets[maxAlphabet+1]; //A_l in paper
 	std::vector<size_t> ret; //A_lms,right in paper
 	auto LMSPosition = LMSLeft.begin(); //LMSLeft is A_lms,left in paper
 	assert(LMSPosition != LMSLeft.end());
-	std::vector<size_t> numbersWritten(maxAlphabet, 0);
-	assert(maxAlphabet < std::numeric_limits<int>::max());
-	for (int bucket = 0; bucket < maxAlphabet; bucket++)
+	std::vector<size_t> numbersWritten(maxAlphabet+1, 0);
+	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
+	for (int bucket = 0; bucket < maxAlphabet+1; bucket++)
 	{
 		while (LMSPosition != LMSLeft.end() && text[*LMSPosition] == bucket)
 		{
@@ -357,18 +358,23 @@ std::vector<size_t> step8(const Alphabet* text, size_t textLen, size_t maxAlphab
 extern std::vector<size_t> step8(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSRight, unsigned char* result, const std::vector<size_t>& charSums);
 extern std::vector<size_t> step8(const char* text, size_t textLen, const std::vector<size_t>& LMSRight, char* result, const std::vector<size_t>& charSums);
 
+//maxAlphabet is the largest alphabet that appears in the source
+//for unsigned char use maxAlphabet == 255
+//for larger alphabets (eg. size_t), take the largest number that actually appears and use that
 template <class Alphabet>
-void bwt(const Alphabet* source, size_t sourceLen, Alphabet* dest)
+void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet* dest)
 {
-	auto charSum = charSums(source, sourceLen);
-	auto first = step1(source, sourceLen);
-	auto second = step2(source, sourceLen, first);
-	auto third = step3(source, sourceLen, second);
-	auto fourth = step4(source, sourceLen, third);
+	auto charSum = charSums(source, sourceLen, maxAlphabet);
+	auto first = step1(source, sourceLen, maxAlphabet);
+	auto second = step2(source, sourceLen, maxAlphabet, first);
+	auto third = step3(source, sourceLen, maxAlphabet, second);
+	auto fourth = step4(source, sourceLen, maxAlphabet, third);
 	auto fifth = step5(fourth.first);
 	auto sixth = step6(fifth, fourth.second);
-	auto seventh = step7(source, sourceLen, sixth, dest, charSum);
+	auto seventh = step7(source, sourceLen, maxAlphabet, sixth, dest, charSum);
 	step8(source, sourceLen, seventh, dest, charSum);
 }
+
+extern void bwt(const char* source, size_t sourceLen, char* dest);
 
 #endif

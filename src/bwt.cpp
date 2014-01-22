@@ -43,22 +43,22 @@ std::pair<std::vector<size_t>, std::vector<size_t>> step4(const unsigned char* t
 	return step4<unsigned char>((const unsigned char*)text, textLen, 255, LMSLeft);
 }
 
+std::vector<size_t> step7(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSLeft, unsigned char* result, const std::vector<size_t>& charSums)
+{
+	return step7<unsigned char>((const unsigned char*)text, textLen, 255, LMSLeft, (unsigned char*)result, charSums);
+}
+
 std::vector<size_t> step7(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft, char* result, const std::vector<size_t>& charSums)
 {
 	return step7<unsigned char>((const unsigned char*)text, textLen, 255, LMSLeft, (unsigned char*)result, charSums);
 }
 
-std::vector<size_t> step7(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSLeft, char* result, const std::vector<size_t>& charSums)
-{
-	return step7<unsigned char>((const unsigned char*)text, textLen, 255, LMSLeft, (unsigned char*)result, charSums);
-}
-
-std::vector<size_t> step8(const char* text, size_t textLen, const std::vector<size_t>& LMSRight, char* result, const std::vector<size_t>& charSums)
+std::vector<size_t> step8(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSRight, unsigned char* result, const std::vector<size_t>& charSums)
 {
 	return step8<unsigned char>((const unsigned char*)text, textLen, 255, LMSRight, (unsigned char*)result, charSums);
 }
 
-std::vector<size_t> step8(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSRight, char* result, const std::vector<size_t>& charSums)
+std::vector<size_t> step8(const char* text, size_t textLen, const std::vector<size_t>& LMSRight, char* result, const std::vector<size_t>& charSums)
 {
 	return step8<unsigned char>((const unsigned char*)text, textLen, 255, LMSRight, (unsigned char*)result, charSums);
 }
@@ -71,6 +71,11 @@ std::vector<size_t> charSums(const char* text, size_t textLen)
 std::vector<size_t> charSums(const unsigned char* text, size_t textLen)
 {
 	return charSums<unsigned char>((const unsigned char*)text, textLen, 255);
+}
+
+void bwt(const char* source, size_t sourceLen, char* dest)
+{
+	bwt<unsigned char>((const unsigned char*)source, sourceLen, 255, (unsigned char*)dest);
 }
 
 //do a counting sort on the rotated strings and pick the last element
