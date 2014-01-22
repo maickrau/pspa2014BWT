@@ -28,29 +28,19 @@ std::vector<size_t> step8(const char* text, size_t textLen, const std::vector<si
 	return step8((const unsigned char*)text, textLen, LMSRight, (unsigned char*)result, charSums);
 }
 
-std::vector<size_t> charSums(const char* text, size_t textLen)
-{
-	return charSums((const unsigned char*)text, textLen);
-}
-
 std::pair<std::vector<size_t>, std::vector<size_t>> step4(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft)
 {
 	return step4((const unsigned char*)text, textLen, LMSLeft);
 }
 
+std::vector<size_t> charSums(const char* text, size_t textLen)
+{
+	return charSums<unsigned char>((const unsigned char*)text, textLen, 255);
+}
+
 std::vector<size_t> charSums(const unsigned char* text, size_t textLen)
 {
-	std::vector<size_t> sums(256, 0);
-	for (size_t i = 0; i < textLen; i++)
-	{
-		sums[text[i]]++;
-	}
-	std::vector<size_t> res(256, 0);
-	for (int i = 1; i < 256; i++)
-	{
-		res[i] = res[i-1]+sums[i-1];
-	}
-	return res;
+	return charSums<unsigned char>((const unsigned char*)text, textLen, 255);
 }
 
 //find LMS-type suffixes in text, return a vector of their indices
@@ -306,6 +296,53 @@ bool LMSSubstringsAreEqual(const unsigned char* text, size_t textLen, size_t str
 		}
 	} while (str1 != start);
 	assert(false);
+}
+
+//do a counting sort on the rotated strings and pick the last element
+std::vector<size_t> bwtDirectly(const std::vector<size_t>& data)
+{
+	auto max = std::max_element(data.begin(), data.end());
+	assert(*max <= data.size());
+	std::vector<size_t> location(*max, 0);
+	for (size_t i = 0; i < data.size(); i++)
+	{
+		location[data[i]] = i+1; //use indexes that start from 1 so 0 is reserved as "unused"
+	}
+	std::vector<size_t> ret;
+	for (auto i = location.begin(); i != location.end(); i++)
+	{
+		if (*i != 0)
+		{
+			size_t loc = *i-2;
+			if (loc == 1)
+			{
+				loc = data.size()-1;
+			}
+			ret.push_back(data[loc]);
+		}
+	}
+	return ret;
+}
+
+std::vector<size_t> step5(const std::vector<size_t>& Sprime)
+{
+	std::vector<bool> isUnique(Sprime.size(), true);
+	bool canCalculateDirectly = true;
+	for (auto i = Sprime.begin(); i != Sprime.end(); i++)
+	{
+		if (!isUnique[*i])
+		{
+			canCalculateDirectly = false;
+			break;
+		}
+		isUnique[*i] = false;
+	}
+	if (canCalculateDirectly)
+	{
+		return bwtDirectly(Sprime);
+	}
+	return std::vector<size_t>();
+//	return bwt(Sprime.data(), Sprime.size());
 }
 
 //return.first is S', return.second is R

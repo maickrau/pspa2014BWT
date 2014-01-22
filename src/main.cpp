@@ -132,7 +132,7 @@ void testStep8(const char* text, size_t textlen, const char* wantedText, const s
 	delete [] resultString;
 }
 
-void test()
+void testSteps()
 {
 	//test each step on paper's example
 	//indices corrected to start at 0 insted of 1
@@ -164,7 +164,44 @@ void test()
 	testStep8(testString, testStringLen, "a\0s\0mammss\0\0\0\0\0\0\0\0\0\0\0", wanted7, wantedCharSums);
 }
 
+void testBWT()
+{
+	const char* testString = "amammmasasmasassaara\0";
+	const char* expected = "ars\0mammssamsmaasaaaa";
+	int testStringLen = 21; //includes trailing \0
+	char* result = new char[testStringLen]();
+	bwt(testString, testStringLen, result);
+	bool correct = true;
+	for (int i = 0; i < testStringLen; i++)
+	{
+		if (result[i] != testString[i])
+		{
+			correct = false;
+			break;
+		}
+	}
+	if (!correct)
+	{
+		std::cout << "BWT test wrong, expected:\n\"";
+		for (int i = 0; i < testStringLen; i++)
+		{
+			std::cout << expected[i];
+		}
+		std::cout << "\"\n, got:\n\"";
+		for (int i = 0; i < testStringLen; i++)
+		{
+			std::cout << result[i];
+		}
+		std::cout << "\"\n";
+	}
+	else
+	{
+		std::cout << "BWT test right\n";
+	}
+}
+
 int main(int argc, char** argv)
 {
-	test();
+	testSteps();
+//	testBWT();
 }
