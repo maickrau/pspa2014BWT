@@ -18,6 +18,31 @@ std::vector<size_t> step3(const char* text, size_t textLen, const std::vector<si
 	return step3((const unsigned char*)text, textLen, LMSRight);
 }
 
+std::vector<size_t> step7(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft, char* result, const std::vector<size_t>& charSums)
+{
+	return step7((const unsigned char*)text, textLen, LMSLeft, (unsigned char*)result, charSums);
+}
+
+std::vector<size_t> charSums(const char* text, size_t textLen)
+{
+	return charSums((const unsigned char*)text, textLen);
+}
+
+std::vector<size_t> charSums(const unsigned char* text, size_t textLen)
+{
+	std::vector<size_t> sums(256, 0);
+	for (size_t i = 0; i < textLen; i++)
+	{
+		sums[text[i]]++;
+	}
+	std::vector<size_t> res(256, 0);
+	for (int i = 1; i < 256; i++)
+	{
+		res[i] = res[i-1]+sums[i-1];
+	}
+	return res;
+}
+
 //find LMS-type suffixes in text, return a vector of their indices
 std::vector<size_t> step1(const unsigned char* text, size_t textLen)
 {
@@ -72,7 +97,7 @@ std::vector<size_t> step2(const unsigned char* text, size_t textLen, const std::
 	{
 		while (LMSPosition != LMSLeft.end() && text[*LMSPosition] == bucket)
 		{
-			buckets[bucket].push_back(*LMSPosition);
+			buckets[text[*LMSPosition-1]].push_back(*LMSPosition-1);
 			LMSPosition++;
 		}
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
@@ -99,6 +124,63 @@ std::vector<size_t> step2(const unsigned char* text, size_t textLen, const std::
 	return ret;
 }
 
+//charSums is a vector that tells how many characters in text are less than that char
+//eg. charSums['m'] == number of characters which are less than m
+//amammmasasmasassaara\0 => charSums['m'] == 10, charSums['r'] == 15
+std::vector<size_t> step7(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSLeft, unsigned char* result, const std::vector<size_t>& charSums)
+{
+	std::vector<size_t> buckets[256]; //A_l in paper
+	std::vector<size_t> ret; //A_lms,right in paper
+	auto LMSPosition = LMSLeft.begin(); //LMSLeft is A_lms,left in paper
+	assert(LMSPosition != LMSLeft.end());
+	std::vector<size_t> numbersWritten(256, 0);
+	for (int bucket = 0; bucket < 256; bucket++)
+	{
+		while (LMSPosition != LMSLeft.end() && text[*LMSPosition] == bucket)
+		{
+			size_t posminus1 = *LMSPosition-1;
+			assert(*LMSPosition != 0); //first character can't be a LMS type suffix... right?
+			buckets[text[posminus1]].push_back(posminus1);
+			size_t charToWrite = posminus1-1;
+			if (posminus1 == 0)
+			{
+				charToWrite = textLen;
+			}
+			result[charSums[text[posminus1]]+numbersWritten[text[posminus1]]] = text[charToWrite];
+			numbersWritten[text[posminus1]]++;
+			LMSPosition++;
+		}
+		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
+		for (size_t i = 0; i < buckets[bucket].size(); i++)
+		{
+			size_t j = buckets[bucket][i];
+			size_t jminus1 = j-1;
+			if (j == 0)
+			{
+				jminus1 = textLen-1; //is this right?
+			}
+			assert(j <= textLen);
+			if (text[jminus1] >= text[j])
+			{
+				buckets[text[jminus1]].push_back(jminus1);
+				size_t charToWrite = jminus1-1;
+				if (jminus1 == 0)
+				{
+					charToWrite = textLen;
+				}
+				result[charSums[text[jminus1]]+numbersWritten[text[jminus1]]] = text[charToWrite];
+				numbersWritten[text[jminus1]]++;
+				buckets[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
+			}
+			else
+			{
+				ret.push_back(j);
+			}
+		}
+	}
+	return ret;
+}
+
 //same as step 2 in right-to-left order, see step 2 for documentation
 std::vector<size_t> step3(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSRight)
 {
@@ -109,7 +191,7 @@ std::vector<size_t> step3(const unsigned char* text, size_t textLen, const std::
 	{
 		while (LMSPosition != LMSRight.rend() && text[*LMSPosition] == bucket)
 		{
-			buckets[bucket].push_back(*LMSPosition);
+			buckets[text[*LMSPosition-1]].push_back(*LMSPosition-1);
 			LMSPosition++;
 		}
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
