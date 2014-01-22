@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cstdlib>
+#include <utility>
 
 std::vector<size_t> charSums(const char* text, size_t textLen);
 std::vector<size_t> charSums(const unsigned char* text, size_t textLen);
@@ -18,5 +19,7 @@ std::vector<size_t> step7(const unsigned char* text, size_t textLen, const std::
 std::vector<size_t> step7(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft, char* result, const std::vector<size_t>& charSums);
 std::vector<size_t> step8(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSRight, unsigned char* result, const std::vector<size_t>& charSums);
 std::vector<size_t> step8(const char* text, size_t textLen, const std::vector<size_t>& LMSRight, char* result, const std::vector<size_t>& charSums);
+std::pair<std::vector<size_t>, std::vector<size_t>> step4(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft);
+std::pair<std::vector<size_t>, std::vector<size_t>> step4(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSLeft);
 
 #endif

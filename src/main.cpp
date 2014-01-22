@@ -46,6 +46,13 @@ void testStep3(const char* text, size_t textlen, const std::vector<size_t>& step
 	testEqualityAndWhine("step 3", text, textlen, result, wantedResult);
 }
 
+void testStep4(const char* text, size_t textlen, const std::vector<size_t>& step3result, const std::vector<size_t>& wanted4, const std::vector<size_t>& wantedR)
+{
+	auto result = step4(text, textlen, step3result);
+	testEqualityAndWhine("step 4 S\'", text, textlen, result.first, wanted4);
+	testEqualityAndWhine("step 4 R", text, textlen, result.second, wantedR);
+}
+
 void testStep6(const char* text, size_t textlen, const std::vector<size_t>& BWTprime, const std::vector<size_t>& R, const std::vector<size_t>& wantedResult)
 {
 	std::vector<size_t> result = step6(BWTprime, R);
@@ -146,8 +153,10 @@ void test()
 	testStep2(testString, testStringLen, wanted, wanted2);
 	std::vector<size_t> wanted3 { 20, 16, 2, 6, 11, 8, 13 };
 	testStep3(testString, testStringLen, wanted2, wanted3);
-	std::vector<size_t> wanted5 { 1, 5, 0, 2, 4, 3, 3 };
 	std::vector<size_t> wantedR { 2, 20, 6, 13, 11, 16 };
+	std::vector<size_t> wanted4 { 3, 4, 5, 4, 6, 2, 1 }; //NOT changed because they aren't indices, they're letters in an alphabet
+	testStep4(testString, testStringLen, wanted3, wanted4, wantedR);
+	std::vector<size_t> wanted5 { 1, 5, 0, 2, 4, 3, 3 };
 	std::vector<size_t> wanted6 { 20, 16, 2, 6, 11, 13, 13 };
 	testStep6(testString, testStringLen, wanted5, wantedR, wanted6);
 	std::vector<size_t> wanted7 { 1, 3, 18, 12, 12, 9, 14 };
