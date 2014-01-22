@@ -300,7 +300,60 @@ extern std::vector<size_t> step7(const unsigned char* text, size_t textLen, cons
 extern std::vector<size_t> step7(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft, char* result, const std::vector<size_t>& charSums);
 
 template <class Alphabet>
-std::vector<size_t> step8(const Alphabet* text, size_t textLen, Alphabet maxAlphabet, const std::vector<size_t>& LMSRight, Alphabet* result, const std::vector<size_t>& charSums);
+std::vector<size_t> step8(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSRight, unsigned char* result, const std::vector<size_t>& charSums)
+{
+	std::vector<size_t> buckets[maxAlphabet+1]; //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
+	std::vector<size_t> ret; //A_lms,left in paper, built in reverse order
+	auto LMSPosition = LMSRight.rbegin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
+	std::vector<size_t> numbersWritten(maxAlphabet+1, 0);
+	assert(maxAlphabet < std::numeric_limits<int>::max());
+	for (int bucket = maxAlphabet; bucket >= 0; bucket--)
+	{
+		while (LMSPosition != LMSRight.rend() && text[*LMSPosition] == bucket)
+		{
+			size_t posminus1 = *LMSPosition-1;
+			assert(*LMSPosition != 0); //first character can't be a LMS type suffix... right?
+			buckets[text[posminus1]].push_back(posminus1);
+			size_t charToWrite = posminus1-1;
+			if (posminus1 == 0)
+			{
+				charToWrite = textLen;
+			}
+			result[charSums[text[posminus1]+1]-numbersWritten[text[posminus1]]-1] = text[charToWrite];
+			numbersWritten[text[posminus1]]++;
+			LMSPosition++;
+		}
+		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
+		for (size_t i = 0; i < buckets[bucket].size(); i++)
+		{
+			size_t j = buckets[bucket][i];
+			size_t jminus1 = j-1;
+			if (j == 0)
+			{
+				jminus1 = textLen-1; //is this right?
+			}
+			assert(j <= textLen);
+			if (text[jminus1] <= text[j])
+			{
+				buckets[text[jminus1]].push_back(jminus1);
+				size_t charToWrite = jminus1-1;
+				if (jminus1 == 0)
+				{
+					charToWrite = textLen;
+				}
+				result[charSums[text[jminus1]+1]-numbersWritten[text[jminus1]]-1] = text[charToWrite];
+				numbersWritten[text[jminus1]]++;
+				buckets[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
+			}
+			else
+			{
+				ret.push_back(j);
+			}
+		}
+	}
+	std::reverse(ret.begin(), ret.end());
+	return ret;
+}
 extern std::vector<size_t> step8(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSRight, unsigned char* result, const std::vector<size_t>& charSums);
 extern std::vector<size_t> step8(const char* text, size_t textLen, const std::vector<size_t>& LMSRight, char* result, const std::vector<size_t>& charSums);
 
