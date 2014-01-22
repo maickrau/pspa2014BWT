@@ -33,6 +33,16 @@ std::vector<size_t> step3(const unsigned char* text, size_t textLen, const std::
 	return step3<unsigned char>((const unsigned char*)text, textLen, 255, LMSRight);
 }
 
+std::pair<std::vector<size_t>, std::vector<size_t>> step4(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft)
+{
+	return step4<unsigned char>((const unsigned char*)text, textLen, 255, LMSLeft);
+}
+
+std::pair<std::vector<size_t>, std::vector<size_t>> step4(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSLeft)
+{
+	return step4<unsigned char>((const unsigned char*)text, textLen, 255, LMSLeft);
+}
+
 std::vector<size_t> step7(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft, char* result, const std::vector<size_t>& charSums)
 {
 	return step7((const unsigned char*)text, textLen, LMSLeft, (unsigned char*)result, charSums);
@@ -41,11 +51,6 @@ std::vector<size_t> step7(const char* text, size_t textLen, const std::vector<si
 std::vector<size_t> step8(const char* text, size_t textLen, const std::vector<size_t>& LMSRight, char* result, const std::vector<size_t>& charSums)
 {
 	return step8((const unsigned char*)text, textLen, LMSRight, (unsigned char*)result, charSums);
-}
-
-std::pair<std::vector<size_t>, std::vector<size_t>> step4(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft)
-{
-	return step4((const unsigned char*)text, textLen, LMSLeft);
 }
 
 std::vector<size_t> charSums(const char* text, size_t textLen)
@@ -169,31 +174,6 @@ std::vector<size_t> step8(const unsigned char* text, size_t textLen, const std::
 	return ret;
 }
 
-bool LMSSubstringsAreEqual(const unsigned char* text, size_t textLen, size_t str1, size_t str2, const std::vector<bool>& LMSSubstringBorder)
-{
-	size_t start = str1;
-	do
-	{
-		str1++;
-		str2++;
-		str1 %= textLen;
-		str2 %= textLen;
-		if (LMSSubstringBorder[str1] ^ LMSSubstringBorder[str2])
-		{
-			return false;
-		}
-		if (LMSSubstringBorder[str1] && LMSSubstringBorder[str2])
-		{
-			return true;
-		}
-		if (text[str1] != text[str2])
-		{
-			return false;
-		}
-	} while (str1 != start);
-	assert(false);
-}
-
 //do a counting sort on the rotated strings and pick the last element
 std::vector<size_t> bwtDirectly(const std::vector<size_t>& data)
 {
@@ -239,55 +219,6 @@ std::vector<size_t> step5(const std::vector<size_t>& Sprime)
 	}
 	return std::vector<size_t>();
 //	return bwt(Sprime.data(), Sprime.size());
-}
-
-//return.first is S', return.second is R
-std::pair<std::vector<size_t>, std::vector<size_t>> step4(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSLeft)
-{
-	std::pair<std::vector<size_t>, std::vector<size_t>> ret;
-	std::vector<bool> LMSSubstringBorder(textLen, false);
-	for (auto i = LMSLeft.begin(); i != LMSLeft.end(); i++)
-	{
-		LMSSubstringBorder[*i] = true;
-	}
-	std::vector<bool> differentThanLast(LMSLeft.size(), true); //B in paper
-	for (size_t i = 1; i < LMSLeft.size(); i++)
-	{
-		differentThanLast[i] = !LMSSubstringsAreEqual(text, textLen, LMSLeft[i-1], LMSLeft[i], LMSSubstringBorder);
-	}
-	//construct R
-	for (size_t i = 0; i < LMSLeft.size(); i++)
-	{
-		if (differentThanLast[(i+1)%LMSLeft.size()])
-		{
-			size_t pos = LMSLeft[i];
-			do
-			{
-				pos++;
-				pos %= textLen;
-			} while (!LMSSubstringBorder[pos]);
-			assert(pos != 0);
-			ret.second.push_back(pos);
-		}
-	}
-	std::vector<size_t> sparseSPrime((textLen+1)/2, 0); //not sure if needs to round up, do it just in case
-	size_t currentName = 0;
-	for (size_t i = 0; i < LMSLeft.size(); i++)
-	{
-		if (differentThanLast[i])
-		{
-			currentName++;
-		}
-		sparseSPrime[LMSLeft[i]/2] = currentName;
-	}
-	for (auto i = sparseSPrime.begin(); i != sparseSPrime.end(); i++)
-	{
-		if (*i != 0)
-		{
-			ret.first.push_back(*i);
-		}
-	}
-	return ret;
 }
 
 std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector<size_t>& R)
