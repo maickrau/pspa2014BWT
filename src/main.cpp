@@ -90,6 +90,41 @@ void testStep7(const char* text, size_t textlen, const char* wantedText, const s
 	testEqualityAndWhine("step 7", text, textlen, result, wantedResult);
 }
 
+void testStep8(const char* text, size_t textlen, const char* wantedText, const std::vector<size_t>& step6result, const std::vector<size_t>& charSums)
+{
+	char* resultString = new char[textlen](); //initialized to \0
+	step8(text, textlen, step6result, resultString, charSums);
+	//no strcmp/strncmp because there will be \0 inside result
+	bool right = true;
+	for (size_t i = 0; i < textlen; i++)
+	{
+		if (resultString[i] != wantedText[i])
+		{
+			right = false;
+			break;
+		}
+	}
+	if (!right)
+	{
+		std::cout << "Step 8 BWT-written result not correct, expected:\n\"";
+		for (size_t i = 0; i < textlen; i++)
+		{
+			std::cout << wantedText[i];
+		}
+		std::cout << "\"\ngot:\n\"";
+		for (size_t i = 0; i < textlen; i++)
+		{
+			std::cout << resultString[i];
+		}
+		std::cout << "\"\n";
+	}
+	else
+	{
+		std::cout << "step 8 equal";
+	}
+	delete [] resultString;
+}
+
 void test()
 {
 	//test each step on paper's example
@@ -117,6 +152,7 @@ void test()
 	testStep6(testString, testStringLen, wanted5, wantedR, wanted6);
 	std::vector<size_t> wanted7 { 1, 3, 18, 12, 12, 9, 14 };
 	testStep7(testString, testStringLen, "\0r\0\0\0\0\0\0\0\0amsmaasaaaa", wanted6, wantedCharSums, wanted7);
+	testStep8(testString, testStringLen, "a\0s\0mammss\0\0\0\0\0\0\0\0\0\0\0", wanted7, wantedCharSums);
 }
 
 int main(int argc, char** argv)
