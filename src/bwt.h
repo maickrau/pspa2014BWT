@@ -10,5 +10,6 @@ std::vector<size_t> step2(const char* text, size_t textLen, const std::vector<si
 std::vector<size_t> step2(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSLeft);
 std::vector<size_t> step3(const char* text, size_t textLen, const std::vector<size_t>& LMSRight);
 std::vector<size_t> step3(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSRight);
+std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector<size_t>& R);
 
 #endif

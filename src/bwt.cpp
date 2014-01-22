@@ -136,3 +136,13 @@ std::vector<size_t> step3(const unsigned char* text, size_t textLen, const std::
 	std::reverse(ret.begin(), ret.end());
 	return ret;
 }
+
+std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector<size_t>& R)
+{
+	std::vector<size_t> ret;
+	for (auto i = BWTprime.begin(); i != BWTprime.end(); i++)
+	{
+		ret.push_back(R[*i]);
+	}
+	return ret;
+}

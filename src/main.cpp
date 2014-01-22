@@ -46,6 +46,12 @@ void testStep3(const char* text, size_t textlen, const std::vector<size_t>& step
 	testEqualityAndWhine("step 3", text, textlen, result, wantedResult);
 }
 
+void testStep6(const char* text, size_t textlen, const std::vector<size_t>& BWTprime, const std::vector<size_t>& R, const std::vector<size_t>& wantedResult)
+{
+	std::vector<size_t> result = step6(BWTprime, R);
+	testEqualityAndWhine("step 6", text, textlen, result, wantedResult);
+}
+
 void test()
 {
 	//test each step on paper's example
@@ -56,6 +62,10 @@ void test()
 	testStep2("amammmasasmasassaara\0", 21, wanted, wanted2);
 	std::vector<size_t> wanted3 { 20, 16, 2, 6, 11, 8, 13 };
 	testStep3("amammmasasmasassaara\0", 21, wanted2, wanted3);
+	std::vector<size_t> wanted5 { 1, 5, 0, 2, 4, 3, 3 };
+	std::vector<size_t> wantedR { 2, 20, 6, 13, 11, 16 };
+	std::vector<size_t> wanted6 { 20, 16, 2, 6, 11, 13, 13 };
+	testStep6("amammmasasmasassaara\0", 21, wanted5, wantedR, wanted6);
 }
 
 int main(int argc, char** argv)
