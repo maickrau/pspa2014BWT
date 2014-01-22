@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdlib>
 #include <utility>
+#include <cassert>
 
 template <class Alphabet>
 std::vector<size_t> charSums(const Alphabet* text, size_t textLen, Alphabet maxAlphabet)
@@ -24,8 +25,50 @@ std::vector<size_t> charSums(const Alphabet* text, size_t textLen, Alphabet maxA
 extern std::vector<size_t> charSums(const char* text, size_t textLen);
 extern std::vector<size_t> charSums(const unsigned char* text, size_t textLen);
 
+//find LMS-type suffixes in text, return a vector of their indices
 template <class Alphabet>
-std::vector<size_t> step1(const Alphabet* text, size_t textLen, Alphabet maxAlphabet);
+std::vector<size_t> step1(const Alphabet* text, size_t textLen, Alphabet maxAlphabet)
+{
+	assert(textLen > 0);
+	std::vector<size_t> buckets[maxAlphabet];
+	bool isSType = true; //last character is always s-type
+	bool equalIsSType = false; //if text[i] == text[i-1], is text[i-1] s-type?
+	//i > 0 because 0 can never be LMS-type
+	for (size_t i = textLen-1; i > 0; i--)
+	{
+		bool nextIsSType;
+		if (text[i-1] < text[i])
+		{
+			nextIsSType = true;
+		}
+		else if (text[i-1] > text[i])
+		{
+			nextIsSType = false;
+		}
+		else
+		{
+			nextIsSType = equalIsSType;
+		}
+		if (isSType && !nextIsSType)
+		{
+			buckets[text[i]].push_back(i);
+		}
+		if (text[i-1] != text[i])
+		{
+			equalIsSType = text[i-1] < text[i];
+		}
+		isSType = nextIsSType;
+	}
+	std::vector<size_t> ret; //A_lms, left in paper
+	//indices were inserted in reverse order, reverse the vector to get them in right order
+	for (int i = 0; i < maxAlphabet; i++)
+	{
+		std::reverse(buckets[i].begin(), buckets[i].end());
+		ret.insert(ret.end(), buckets[i].begin(), buckets[i].end());
+	}
+	return ret;
+}
+
 extern std::vector<size_t> step1(const char* text, size_t textLen);
 extern std::vector<size_t> step1(const unsigned char* text, size_t textLen);
 
