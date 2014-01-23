@@ -6,6 +6,7 @@
 #include <utility>
 #include <cassert>
 #include <limits>
+#include <iostream>
 
 template <class Alphabet>
 std::vector<size_t> charSums(const Alphabet* text, size_t textLen, size_t maxAlphabet)
@@ -13,6 +14,7 @@ std::vector<size_t> charSums(const Alphabet* text, size_t textLen, size_t maxAlp
 	std::vector<size_t> sums(maxAlphabet+1, 0);
 	for (size_t i = 0; i < textLen; i++)
 	{
+		assert(text[i] < maxAlphabet+1);
 		sums[text[i]]++;
 	}
 	std::vector<size_t> res(maxAlphabet+1, 0);
@@ -79,18 +81,23 @@ extern std::vector<size_t> step1(const unsigned char* text, size_t textLen);
 template <class Alphabet>
 std::vector<size_t> step2(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSLeft)
 {
+	std::vector<size_t> bucketsS[maxAlphabet+1];
 	std::vector<size_t> buckets[maxAlphabet+1]; //A_l in paper
 	std::vector<size_t> ret; //A_lms,right in paper
 	auto LMSPosition = LMSLeft.begin(); //LMSLeft is A_lms,left in paper
 	assert(LMSPosition != LMSLeft.end());
 	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
-	for (int bucket = 0; bucket < maxAlphabet+1; bucket++)
-	{
-		while (LMSPosition != LMSLeft.end() && text[*LMSPosition] == bucket)
+		while (LMSPosition != LMSLeft.end() /*&& text[*LMSPosition] == bucket*/)
 		{
-			buckets[text[*LMSPosition-1]].push_back(*LMSPosition-1);
+			assert(*LMSPosition != 0);
+			assert(*LMSPosition-1 < textLen);
+			assert(text[*LMSPosition-1] < maxAlphabet+1);
+//			buckets[text[*LMSPosition-1]].push_back(*LMSPosition-1);
+			bucketsS[text[*LMSPosition]].push_back(*LMSPosition);
 			LMSPosition++;
 		}
+	for (int bucket = 0; bucket < maxAlphabet+1; bucket++)
+	{
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
 		for (size_t i = 0; i < buckets[bucket].size(); i++)
 		{
@@ -103,8 +110,29 @@ std::vector<size_t> step2(const Alphabet* text, size_t textLen, size_t maxAlphab
 			assert(j <= textLen);
 			if (text[jminus1] >= text[j])
 			{
+				assert(text[jminus1] < maxAlphabet+1);
 				buckets[text[jminus1]].push_back(jminus1);
 				buckets[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
+			}
+			else
+			{
+				ret.push_back(j);
+			}
+		}
+		for (size_t i = 0; i < bucketsS[bucket].size(); i++)
+		{
+			size_t j = bucketsS[bucket][i];
+			size_t jminus1 = j-1;
+			if (j == 0)
+			{
+				jminus1 = textLen-1; //is this right?
+			}
+			assert(j <= textLen);
+			if (text[jminus1] >= text[j])
+			{
+				assert(text[jminus1] < maxAlphabet+1);
+				buckets[text[jminus1]].push_back(jminus1);
+				bucketsS[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
 			}
 			else
 			{
@@ -118,21 +146,30 @@ std::vector<size_t> step2(const Alphabet* text, size_t textLen, size_t maxAlphab
 extern std::vector<size_t> step2(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft);
 extern std::vector<size_t> step2(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSLeft);
 
-//sorts (with step 3) the LMS-type substrings
+//sorts (with step 2) the LMS-type substrings
 template <class Alphabet>
 std::vector<size_t> step3(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSRight)
 {
+	std::vector<size_t> bucketsL[maxAlphabet+1];
 	std::vector<size_t> buckets[maxAlphabet+1]; //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
 	std::vector<size_t> ret; //A_lms,left in paper, built in reverse order
-	auto LMSPosition = LMSRight.rbegin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
+	auto LMSPosition = LMSRight.begin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
 	assert(maxAlphabet < std::numeric_limits<int>::max());
-	for (int bucket = maxAlphabet; bucket >= 0; bucket--)
-	{
-		while (LMSPosition != LMSRight.rend() && text[*LMSPosition] == bucket)
+		while (LMSPosition != LMSRight.end() /*&& text[*LMSPosition] == bucket*/)
 		{
-			buckets[text[*LMSPosition-1]].push_back(*LMSPosition-1);
+			//*LMSPosition can be 0 because it isn't always(ever?) on a LMS substring boundary
+			size_t pushThis = *LMSPosition-1;
+			if (*LMSPosition == 0)
+			{
+				pushThis = textLen-1;
+			}
+			assert(text[pushThis] < maxAlphabet+1);
+//			buckets[text[pushThis]].push_back(pushThis);
+			bucketsL[text[*LMSPosition]].push_back(*LMSPosition);
 			LMSPosition++;
 		}
+	for (int bucket = maxAlphabet; bucket >= 0; bucket--)
+	{
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
 		for (size_t i = 0; i < buckets[bucket].size(); i++)
 		{
@@ -143,13 +180,39 @@ std::vector<size_t> step3(const Alphabet* text, size_t textLen, size_t maxAlphab
 				jminus1 = textLen-1; //is this right?
 			}
 			assert(j <= textLen);
+			assert(jminus1 <= textLen);
 			if (text[jminus1] <= text[j])
 			{
+				assert(text[jminus1] < maxAlphabet+1);
 				buckets[text[jminus1]].push_back(jminus1);
 				buckets[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
 			}
 			else
 			{
+				assert(j != 0);
+				ret.push_back(j);
+			}
+		}
+		std::reverse(bucketsL[bucket].begin(), bucketsL[bucket].end());
+		for (size_t i = 0; i < bucketsL[bucket].size(); i++)
+		{
+			size_t j = bucketsL[bucket][i];
+			size_t jminus1 = j-1;
+			if (j == 0)
+			{
+				jminus1 = textLen-1; //is this right?
+			}
+			assert(j <= textLen);
+			assert(jminus1 <= textLen);
+			if (text[jminus1] <= text[j])
+			{
+				assert(text[jminus1] < maxAlphabet+1);
+				buckets[text[jminus1]].push_back(jminus1);
+				bucketsL[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
+			}
+			else
+			{
+				assert(j != 0);
 				ret.push_back(j);
 			}
 		}
@@ -194,6 +257,7 @@ std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, 
 	std::vector<bool> LMSSubstringBorder(textLen, false);
 	for (auto i = LMSLeft.begin(); i != LMSLeft.end(); i++)
 	{
+		assert(*i < textLen);
 		LMSSubstringBorder[*i] = true;
 	}
 	std::vector<bool> differentThanLast(LMSLeft.size(), true); //B in paper
@@ -204,8 +268,8 @@ std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, 
 	//construct R
 	for (size_t i = 0; i < LMSLeft.size(); i++)
 	{
-		if (differentThanLast[(i+1)%LMSLeft.size()])
-		{
+//		if (differentThanLast[(i+1)%LMSLeft.size()])
+//		{
 			size_t pos = LMSLeft[i];
 			do
 			{
@@ -214,23 +278,24 @@ std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, 
 			} while (!LMSSubstringBorder[pos]);
 			assert(pos != 0);
 			ret.second.push_back(pos);
-		}
+//		}
 	}
 	std::vector<size_t> sparseSPrime((textLen+1)/2, 0); //not sure if needs to round up, do it just in case
 	size_t currentName = 0;
 	for (size_t i = 0; i < LMSLeft.size(); i++)
 	{
-		if (differentThanLast[i])
-		{
+//		if (differentThanLast[i])
+//		{
 			currentName++;
-		}
+//		}
+		assert(LMSLeft[i]/2 < (textLen+1)/2);
 		sparseSPrime[LMSLeft[i]/2] = currentName;
 	}
 	for (auto i = sparseSPrime.begin(); i != sparseSPrime.end(); i++)
 	{
 		if (*i != 0)
 		{
-			ret.first.push_back(*i);
+			ret.first.push_back(*i-1);
 		}
 	}
 	return ret;
@@ -238,35 +303,43 @@ std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, 
 extern std::pair<std::vector<size_t>, std::vector<size_t>> step4(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft);
 extern std::pair<std::vector<size_t>, std::vector<size_t>> step4(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSLeft);
 
+std::vector<size_t> bwtDirectly(const std::vector<size_t>& data);
+
 std::vector<size_t> step5(const std::vector<size_t>& Sprime);
 
 std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector<size_t>& R);
 
 template <class Alphabet>
-std::vector<size_t> step7(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSLeft, unsigned char* result, const std::vector<size_t>& charSums)
+std::vector<size_t> step7(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSLeft, Alphabet* result, const std::vector<size_t>& charSums)
 {
+	assert(charSums.size() >= maxAlphabet+1);
+	std::vector<size_t> bucketsS[maxAlphabet+1];
 	std::vector<size_t> buckets[maxAlphabet+1]; //A_l in paper
 	std::vector<size_t> ret; //A_lms,right in paper
 	auto LMSPosition = LMSLeft.begin(); //LMSLeft is A_lms,left in paper
 	assert(LMSPosition != LMSLeft.end());
 	std::vector<size_t> numbersWritten(maxAlphabet+1, 0);
 	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
-	for (int bucket = 0; bucket < maxAlphabet+1; bucket++)
-	{
-		while (LMSPosition != LMSLeft.end() && text[*LMSPosition] == bucket)
+		while (LMSPosition != LMSLeft.end()/* && text[*LMSPosition] == bucket*/)
 		{
 			size_t posminus1 = *LMSPosition-1;
 			assert(*LMSPosition != 0); //first character can't be a LMS type suffix... right?
-			buckets[text[posminus1]].push_back(posminus1);
-			size_t charToWrite = posminus1-1;
+			assert(text[posminus1] < maxAlphabet+1);
+//			buckets[text[posminus1]].push_back(posminus1);
+			bucketsS[text[*LMSPosition]].push_back(*LMSPosition);
+/*			size_t charToWrite = posminus1-1;
 			if (posminus1 == 0)
 			{
-				charToWrite = textLen;
+				charToWrite = textLen-1;
 			}
+			assert(charSums[text[posminus1]]+numbersWritten[text[posminus1]] < textLen);
+			assert(charToWrite < textLen);
 			result[charSums[text[posminus1]]+numbersWritten[text[posminus1]]] = text[charToWrite];
-			numbersWritten[text[posminus1]]++;
+			numbersWritten[text[posminus1]]++;*/
 			LMSPosition++;
 		}
+	for (int bucket = 0; bucket < maxAlphabet+1; bucket++)
+	{
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
 		for (size_t i = 0; i < buckets[bucket].size(); i++)
 		{
@@ -274,20 +347,51 @@ std::vector<size_t> step7(const Alphabet* text, size_t textLen, size_t maxAlphab
 			size_t jminus1 = j-1;
 			if (j == 0)
 			{
-				jminus1 = textLen-1; //is this right?
+				jminus1 = textLen-1;
 			}
 			assert(j <= textLen);
 			if (text[jminus1] >= text[j])
 			{
+				assert(text[jminus1] < maxAlphabet+1);
 				buckets[text[jminus1]].push_back(jminus1);
 				size_t charToWrite = jminus1-1;
 				if (jminus1 == 0)
 				{
-					charToWrite = textLen;
+					charToWrite = textLen-1;
 				}
+				assert(charSums[text[jminus1]]+numbersWritten[text[jminus1]] < textLen);
 				result[charSums[text[jminus1]]+numbersWritten[text[jminus1]]] = text[charToWrite];
 				numbersWritten[text[jminus1]]++;
 				buckets[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
+			}
+			else
+			{
+				ret.push_back(j);
+			}
+		}
+//		std::reverse(bucketsS[bucket].begin(), bucketsS[bucket].end());
+		for (size_t i = 0; i < bucketsS[bucket].size(); i++)
+		{
+			size_t j = bucketsS[bucket][i];
+			size_t jminus1 = j-1;
+			if (j == 0)
+			{
+				jminus1 = textLen-1;
+			}
+			assert(j <= textLen);
+			if (text[jminus1] >= text[j])
+			{
+				assert(text[jminus1] < maxAlphabet+1);
+				buckets[text[jminus1]].push_back(jminus1);
+				size_t charToWrite = jminus1-1;
+				if (jminus1 == 0)
+				{
+					charToWrite = textLen-1;
+				}
+				assert(charSums[text[jminus1]]+numbersWritten[text[jminus1]] < textLen);
+				result[charSums[text[jminus1]]+numbersWritten[text[jminus1]]] = text[charToWrite];
+				numbersWritten[text[jminus1]]++;
+				bucketsS[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
 			}
 			else
 			{
@@ -301,29 +405,39 @@ extern std::vector<size_t> step7(const unsigned char* text, size_t textLen, cons
 extern std::vector<size_t> step7(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft, char* result, const std::vector<size_t>& charSums);
 
 template <class Alphabet>
-std::vector<size_t> step8(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSRight, unsigned char* result, const std::vector<size_t>& charSums)
+std::vector<size_t> step8(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSRight, Alphabet* result, const std::vector<size_t>& charSums)
 {
+	assert(charSums.size() >= maxAlphabet+1);
+	std::vector<size_t> bucketsL[maxAlphabet+1];
 	std::vector<size_t> buckets[maxAlphabet+1]; //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
 	std::vector<size_t> ret; //A_lms,left in paper, built in reverse order
-	auto LMSPosition = LMSRight.rbegin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
+	auto LMSPosition = LMSRight.begin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
 	std::vector<size_t> numbersWritten(maxAlphabet+1, 0);
 	assert(maxAlphabet < std::numeric_limits<int>::max());
-	for (int bucket = maxAlphabet; bucket >= 0; bucket--)
-	{
-		while (LMSPosition != LMSRight.rend() && text[*LMSPosition] == bucket)
+		while (LMSPosition != LMSRight.end() /*&& text[*LMSPosition] == bucket*/)
 		{
+			//*LMSPosition can be 0 because it isn't always(ever?) on a LMS substring boundary
 			size_t posminus1 = *LMSPosition-1;
-			assert(*LMSPosition != 0); //first character can't be a LMS type suffix... right?
-			buckets[text[posminus1]].push_back(posminus1);
+			if (*LMSPosition == 0)
+			{
+				posminus1 = textLen-1;
+			}
+			assert(text[posminus1] < maxAlphabet+1);
+//			buckets[text[posminus1]].push_back(posminus1);
+			bucketsL[text[*LMSPosition]].push_back(*LMSPosition);/*
 			size_t charToWrite = posminus1-1;
 			if (posminus1 == 0)
 			{
-				charToWrite = textLen;
+				charToWrite = textLen-1;
 			}
+			assert(text[posminus1]+1 < maxAlphabet+1);
+			assert(charSums[text[posminus1]+1]-numbersWritten[text[posminus1]]-1 < textLen);
 			result[charSums[text[posminus1]+1]-numbersWritten[text[posminus1]]-1] = text[charToWrite];
-			numbersWritten[text[posminus1]]++;
+			numbersWritten[text[posminus1]]++;*/
 			LMSPosition++;
 		}
+	for (int bucket = maxAlphabet; bucket >= 0; bucket--)
+	{
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
 		for (size_t i = 0; i < buckets[bucket].size(); i++)
 		{
@@ -331,26 +445,67 @@ std::vector<size_t> step8(const Alphabet* text, size_t textLen, size_t maxAlphab
 			size_t jminus1 = j-1;
 			if (j == 0)
 			{
-				jminus1 = textLen-1; //is this right?
+				jminus1 = textLen-1;
 			}
 			assert(j <= textLen);
 			if (text[jminus1] <= text[j])
 			{
+				assert(text[jminus1] < maxAlphabet+1);
 				buckets[text[jminus1]].push_back(jminus1);
 				size_t charToWrite = jminus1-1;
 				if (jminus1 == 0)
 				{
-					charToWrite = textLen;
+					charToWrite = textLen-1;
 				}
+				assert(text[jminus1]+1 < maxAlphabet+1);
+				assert(numbersWritten[text[jminus1]] < charSums[text[jminus1]+1]);
+				assert(numbersWritten[text[jminus1]]+1 <= charSums[text[jminus1]+1]);
+				assert(numbersWritten[text[jminus1]]+charSums[text[jminus1]] < charSums[text[jminus1]+1]);
+//				std::cout << charSums[text[jminus1]+1]-numbersWritten[text[jminus1]]-1 << "/" << textLen << "\n";
+				assert(charSums[text[jminus1]+1]-numbersWritten[text[jminus1]]-1 < textLen);
 				result[charSums[text[jminus1]+1]-numbersWritten[text[jminus1]]-1] = text[charToWrite];
 				numbersWritten[text[jminus1]]++;
 				buckets[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
 			}
 			else
 			{
+				assert(j != 0);
 				ret.push_back(j);
 			}
 		}
+		std::reverse(bucketsL[bucket].begin(), bucketsL[bucket].end());
+		for (size_t i = 0; i < bucketsL[bucket].size(); i++)
+		{
+			size_t j = bucketsL[bucket][i];
+			size_t jminus1 = j-1;
+			if (j == 0)
+			{
+				jminus1 = textLen-1;
+			}
+			assert(j <= textLen);
+			if (text[jminus1] <= text[j])
+			{
+				assert(text[jminus1] < maxAlphabet+1);
+				buckets[text[jminus1]].push_back(jminus1);
+				size_t charToWrite = jminus1-1;
+				if (jminus1 == 0)
+				{
+					charToWrite = textLen-1;
+				}
+				assert(text[jminus1]+1 < maxAlphabet+1);
+				assert(numbersWritten[text[jminus1]] < charSums[text[jminus1]+1]);
+				assert(numbersWritten[text[jminus1]]+1 <= charSums[text[jminus1]+1]);
+				assert(charSums[text[jminus1]+1]-numbersWritten[text[jminus1]]-1 < textLen);
+				result[charSums[text[jminus1]+1]-numbersWritten[text[jminus1]]-1] = text[charToWrite];
+				numbersWritten[text[jminus1]]++;
+				bucketsL[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
+			}
+			else
+			{
+				assert(j != 0);
+				ret.push_back(j);
+			}
+		}	
 	}
 	std::reverse(ret.begin(), ret.end());
 	return ret;
@@ -372,9 +527,39 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	auto fifth = step5(fourth.first);
 	auto sixth = step6(fifth, fourth.second);
 	auto seventh = step7(source, sourceLen, maxAlphabet, sixth, dest, charSum);
-	step8(source, sourceLen, seventh, dest, charSum);
+	step8(source, sourceLen, maxAlphabet, seventh, dest, charSum);
 }
 
 extern void bwt(const char* source, size_t sourceLen, char* dest);
+
+template <class Alphabet>
+void inverseBWT(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet* dest)
+{
+	auto charSum = charSums(source, sourceLen, maxAlphabet);
+	std::vector<size_t> usedCharacters(maxAlphabet+1, 0);
+	std::vector<size_t> LFmapping(sourceLen, 0);
+	size_t index = 0;
+	for (size_t i = 0; i < sourceLen; i++)
+	{
+		assert(source[i] < maxAlphabet+1);
+		LFmapping[i] = charSum[source[i]]+usedCharacters[source[i]];
+		usedCharacters[source[i]]++;
+		if (source[i] == 0)
+		{
+			index = i;
+		}
+	}
+	size_t loc = sourceLen-1;
+	do
+	{
+		assert(index < sourceLen);
+		dest[loc] = source[index];
+		index = LFmapping[index];
+		loc--;
+	} while (loc != 0);
+	dest[loc] = source[index];
+}
+
+extern void inverseBWT(const char* source, size_t sourceLen, char* dest);
 
 #endif

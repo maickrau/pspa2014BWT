@@ -82,8 +82,8 @@ void bwt(const char* source, size_t sourceLen, char* dest)
 std::vector<size_t> bwtDirectly(const std::vector<size_t>& data)
 {
 	auto max = std::max_element(data.begin(), data.end());
-	assert(*max <= data.size());
-	std::vector<size_t> location(*max, 0);
+	assert(*max == data.size()-1);
+	std::vector<size_t> location(*max+1, 0);
 	for (size_t i = 0; i < data.size(); i++)
 	{
 		location[data[i]] = i+1; //use indexes that start from 1 so 0 is reserved as "unused"
@@ -94,7 +94,7 @@ std::vector<size_t> bwtDirectly(const std::vector<size_t>& data)
 		if (*i != 0)
 		{
 			size_t loc = *i-2;
-			if (loc == 1)
+			if (*i == 1)
 			{
 				loc = data.size()-1;
 			}
@@ -121,8 +121,15 @@ std::vector<size_t> step5(const std::vector<size_t>& Sprime)
 	{
 		return bwtDirectly(Sprime);
 	}
-	return std::vector<size_t>();
-//	return bwt(Sprime.data(), Sprime.size());
+	size_t* rawResult = new size_t[Sprime.size()]();
+	bwt(Sprime.data(), Sprime.size(), Sprime.size()+1, rawResult); //not sure if Sprime.size() is the largest actually used alphabet, add +1 to make sure
+	std::vector<size_t> result;
+	for (size_t i = 0; i < Sprime.size(); i++)
+	{
+		result.push_back(rawResult[i]);
+	}
+	delete [] rawResult;
+	return result;
 }
 
 std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector<size_t>& R)
@@ -130,7 +137,13 @@ std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector
 	std::vector<size_t> ret;
 	for (auto i = BWTprime.begin(); i != BWTprime.end(); i++)
 	{
+		assert(*i < R.size());
 		ret.push_back(R[*i]);
 	}
 	return ret;
+}
+
+void inverseBWT(const char* source, size_t sourceLen, char* dest)
+{
+	inverseBWT<unsigned char>((const unsigned char*)source, sourceLen, 255, (unsigned char*)dest);
 }
