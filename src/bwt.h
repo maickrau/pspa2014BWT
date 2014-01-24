@@ -152,9 +152,9 @@ std::vector<size_t> step3(const Alphabet* text, size_t textLen, size_t maxAlphab
 	std::vector<size_t> bucketsL[maxAlphabet+1];
 	std::vector<size_t> buckets[maxAlphabet+1]; //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
 	std::vector<size_t> ret; //A_lms,left in paper, built in reverse order
-	auto LMSPosition = LMSRight.begin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
+	auto LMSPosition = LMSRight.rbegin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
 	assert(maxAlphabet < std::numeric_limits<int>::max());
-	while (LMSPosition != LMSRight.end())
+	while (LMSPosition != LMSRight.rend())
 	{
 		//*LMSPosition can be 0 because it isn't always(ever?) on a LMS substring boundary
 		size_t pushThis = *LMSPosition-1;
@@ -191,7 +191,6 @@ std::vector<size_t> step3(const Alphabet* text, size_t textLen, size_t maxAlphab
 				ret.push_back(j);
 			}
 		}
-		std::reverse(bucketsL[bucket].begin(), bucketsL[bucket].end());
 		for (size_t i = 0; i < bucketsL[bucket].size(); i++)
 		{
 			size_t j = bucketsL[bucket][i];
@@ -392,10 +391,10 @@ std::vector<size_t> step8(const Alphabet* text, size_t textLen, size_t maxAlphab
 	std::vector<size_t> bucketsL[maxAlphabet+1];
 	std::vector<size_t> buckets[maxAlphabet+1]; //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
 	std::vector<size_t> ret; //A_lms,left in paper, built in reverse order
-	auto LMSPosition = LMSRight.begin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
+	auto LMSPosition = LMSRight.rbegin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
 	std::vector<size_t> numbersWritten(maxAlphabet+1, 0);
 	assert(maxAlphabet < std::numeric_limits<int>::max());
-	while (LMSPosition != LMSRight.end())
+	while (LMSPosition != LMSRight.rend())
 	{
 		//*LMSPosition can be 0 because it isn't always(ever?) on a LMS substring boundary
 		size_t posminus1 = *LMSPosition-1;
@@ -443,7 +442,6 @@ std::vector<size_t> step8(const Alphabet* text, size_t textLen, size_t maxAlphab
 				ret.push_back(j);
 			}
 		}
-		std::reverse(bucketsL[bucket].begin(), bucketsL[bucket].end());
 		for (size_t i = 0; i < bucketsL[bucket].size(); i++)
 		{
 			size_t j = bucketsL[bucket][i];
