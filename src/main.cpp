@@ -322,6 +322,17 @@ void testBWT4()
 	delete [] result;
 }
 
+void testBWT5()
+{
+	const char* testString = "cabadabab\0";
+	const char* expected = "bbdcbaaa\0a";
+	int testStringLen = 10; //includes trailing \0
+	char* result = new char[testStringLen]();
+	bwt(testString, testStringLen, result);
+	testEqualityAndWhine("BWT test 5", expected, result, testStringLen);
+	delete [] result;
+}
+
 void testReversibility(const char* string)
 {
 	std::cout << "testing reversibility with \"" << string << "\"\n";
@@ -406,6 +417,7 @@ int main(int argc, char** argv)
 	testBWT2();
 	testBWT3();
 	testBWT4();
+	testBWT5();
 	testInverse();
 	testReversibility("hello world");
 	testReversibility("asfjnsdfjklsjkl");
@@ -415,7 +427,7 @@ int main(int argc, char** argv)
 	testReversibility("23t34qy3qt3qat4a");
 	testReversibility("aaaaaaaaaaaaaaa");
 	testReversibility("rtj7yt5uj56uy5twesdgs<df");
-	testReversibilityWithLotsOfRandoms(200, 10);
-	testReversibilityWithLotsOfRandoms(200, 50);
-	testReversibilityWithLotsOfRandoms(10, 5000);
+//	testReversibilityWithLotsOfRandoms(200, 10);
+//	testReversibilityWithLotsOfRandoms(200, 50);
+//	testReversibilityWithLotsOfRandoms(10, 5000);
 }
