@@ -87,15 +87,14 @@ std::vector<size_t> step2(const Alphabet* text, size_t textLen, size_t maxAlphab
 	auto LMSPosition = LMSLeft.begin(); //LMSLeft is A_lms,left in paper
 	assert(LMSPosition != LMSLeft.end());
 	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
-		while (LMSPosition != LMSLeft.end() /*&& text[*LMSPosition] == bucket*/)
-		{
-			assert(*LMSPosition != 0);
-			assert(*LMSPosition-1 < textLen);
-			assert(text[*LMSPosition-1] < maxAlphabet+1);
-//			buckets[text[*LMSPosition-1]].push_back(*LMSPosition-1);
-			bucketsS[text[*LMSPosition]].push_back(*LMSPosition);
-			LMSPosition++;
-		}
+	while (LMSPosition != LMSLeft.end())
+	{
+		assert(*LMSPosition != 0);
+		assert(*LMSPosition-1 < textLen);
+		assert(text[*LMSPosition-1] < maxAlphabet+1);
+		bucketsS[text[*LMSPosition]].push_back(*LMSPosition);
+		LMSPosition++;
+	}
 	for (int bucket = 0; bucket < maxAlphabet+1; bucket++)
 	{
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
@@ -155,19 +154,18 @@ std::vector<size_t> step3(const Alphabet* text, size_t textLen, size_t maxAlphab
 	std::vector<size_t> ret; //A_lms,left in paper, built in reverse order
 	auto LMSPosition = LMSRight.begin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
 	assert(maxAlphabet < std::numeric_limits<int>::max());
-		while (LMSPosition != LMSRight.end() /*&& text[*LMSPosition] == bucket*/)
+	while (LMSPosition != LMSRight.end())
+	{
+		//*LMSPosition can be 0 because it isn't always(ever?) on a LMS substring boundary
+		size_t pushThis = *LMSPosition-1;
+		if (*LMSPosition == 0)
 		{
-			//*LMSPosition can be 0 because it isn't always(ever?) on a LMS substring boundary
-			size_t pushThis = *LMSPosition-1;
-			if (*LMSPosition == 0)
-			{
-				pushThis = textLen-1;
-			}
-			assert(text[pushThis] < maxAlphabet+1);
-//			buckets[text[pushThis]].push_back(pushThis);
-			bucketsL[text[*LMSPosition]].push_back(*LMSPosition);
-			LMSPosition++;
+			pushThis = textLen-1;
 		}
+		assert(text[pushThis] < maxAlphabet+1);
+		bucketsL[text[*LMSPosition]].push_back(*LMSPosition);
+		LMSPosition++;
+	}
 	for (int bucket = maxAlphabet; bucket >= 0; bucket--)
 	{
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
@@ -268,26 +266,20 @@ std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, 
 	//construct R
 	for (size_t i = 0; i < LMSLeft.size(); i++)
 	{
-//		if (differentThanLast[(i+1)%LMSLeft.size()])
-//		{
-			size_t pos = LMSLeft[i];
-			do
-			{
-				pos++;
-				pos %= textLen;
-			} while (!LMSSubstringBorder[pos]);
-			assert(pos != 0);
-			ret.second.push_back(pos);
-//		}
+		size_t pos = LMSLeft[i];
+		do
+		{
+			pos++;
+			pos %= textLen;
+		} while (!LMSSubstringBorder[pos]);
+		assert(pos != 0);
+		ret.second.push_back(pos);
 	}
 	std::vector<size_t> sparseSPrime((textLen+1)/2, 0); //not sure if needs to round up, do it just in case
 	size_t currentName = 0;
 	for (size_t i = 0; i < LMSLeft.size(); i++)
 	{
-//		if (differentThanLast[i])
-//		{
-			currentName++;
-//		}
+		currentName++;
 		assert(LMSLeft[i]/2 < (textLen+1)/2);
 		sparseSPrime[LMSLeft[i]/2] = currentName;
 	}
@@ -320,24 +312,14 @@ std::vector<size_t> step7(const Alphabet* text, size_t textLen, size_t maxAlphab
 	assert(LMSPosition != LMSLeft.end());
 	std::vector<size_t> numbersWritten(maxAlphabet+1, 0);
 	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
-		while (LMSPosition != LMSLeft.end()/* && text[*LMSPosition] == bucket*/)
-		{
-			size_t posminus1 = *LMSPosition-1;
-			assert(*LMSPosition != 0); //first character can't be a LMS type suffix... right?
-			assert(text[posminus1] < maxAlphabet+1);
-//			buckets[text[posminus1]].push_back(posminus1);
-			bucketsS[text[*LMSPosition]].push_back(*LMSPosition);
-/*			size_t charToWrite = posminus1-1;
-			if (posminus1 == 0)
-			{
-				charToWrite = textLen-1;
-			}
-			assert(charSums[text[posminus1]]+numbersWritten[text[posminus1]] < textLen);
-			assert(charToWrite < textLen);
-			result[charSums[text[posminus1]]+numbersWritten[text[posminus1]]] = text[charToWrite];
-			numbersWritten[text[posminus1]]++;*/
-			LMSPosition++;
-		}
+	while (LMSPosition != LMSLeft.end())
+	{
+		size_t posminus1 = *LMSPosition-1;
+		assert(*LMSPosition != 0); //first character can't be a LMS type suffix... right?
+		assert(text[posminus1] < maxAlphabet+1);
+		bucketsS[text[*LMSPosition]].push_back(*LMSPosition);
+		LMSPosition++;
+	}
 	for (int bucket = 0; bucket < maxAlphabet+1; bucket++)
 	{
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
@@ -369,7 +351,6 @@ std::vector<size_t> step7(const Alphabet* text, size_t textLen, size_t maxAlphab
 				ret.push_back(j);
 			}
 		}
-//		std::reverse(bucketsS[bucket].begin(), bucketsS[bucket].end());
 		for (size_t i = 0; i < bucketsS[bucket].size(); i++)
 		{
 			size_t j = bucketsS[bucket][i];
@@ -414,28 +395,18 @@ std::vector<size_t> step8(const Alphabet* text, size_t textLen, size_t maxAlphab
 	auto LMSPosition = LMSRight.begin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
 	std::vector<size_t> numbersWritten(maxAlphabet+1, 0);
 	assert(maxAlphabet < std::numeric_limits<int>::max());
-		while (LMSPosition != LMSRight.end() /*&& text[*LMSPosition] == bucket*/)
+	while (LMSPosition != LMSRight.end())
+	{
+		//*LMSPosition can be 0 because it isn't always(ever?) on a LMS substring boundary
+		size_t posminus1 = *LMSPosition-1;
+		if (*LMSPosition == 0)
 		{
-			//*LMSPosition can be 0 because it isn't always(ever?) on a LMS substring boundary
-			size_t posminus1 = *LMSPosition-1;
-			if (*LMSPosition == 0)
-			{
-				posminus1 = textLen-1;
-			}
-			assert(text[posminus1] < maxAlphabet+1);
-//			buckets[text[posminus1]].push_back(posminus1);
-			bucketsL[text[*LMSPosition]].push_back(*LMSPosition);/*
-			size_t charToWrite = posminus1-1;
-			if (posminus1 == 0)
-			{
-				charToWrite = textLen-1;
-			}
-			assert(text[posminus1]+1 < maxAlphabet+1);
-			assert(charSums[text[posminus1]+1]-numbersWritten[text[posminus1]]-1 < textLen);
-			result[charSums[text[posminus1]+1]-numbersWritten[text[posminus1]]-1] = text[charToWrite];
-			numbersWritten[text[posminus1]]++;*/
-			LMSPosition++;
+			posminus1 = textLen-1;
 		}
+		assert(text[posminus1] < maxAlphabet+1);
+		bucketsL[text[*LMSPosition]].push_back(*LMSPosition);
+		LMSPosition++;
+	}
 	for (int bucket = maxAlphabet; bucket >= 0; bucket--)
 	{
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
@@ -461,7 +432,6 @@ std::vector<size_t> step8(const Alphabet* text, size_t textLen, size_t maxAlphab
 				assert(numbersWritten[text[jminus1]] < charSums[text[jminus1]+1]);
 				assert(numbersWritten[text[jminus1]]+1 <= charSums[text[jminus1]+1]);
 				assert(numbersWritten[text[jminus1]]+charSums[text[jminus1]] < charSums[text[jminus1]+1]);
-//				std::cout << charSums[text[jminus1]+1]-numbersWritten[text[jminus1]]-1 << "/" << textLen << "\n";
 				assert(charSums[text[jminus1]+1]-numbersWritten[text[jminus1]]-1 < textLen);
 				result[charSums[text[jminus1]+1]-numbersWritten[text[jminus1]]-1] = text[charToWrite];
 				numbersWritten[text[jminus1]]++;

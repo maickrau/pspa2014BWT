@@ -427,7 +427,7 @@ int main(int argc, char** argv)
 	testReversibility("23t34qy3qt3qat4a");
 	testReversibility("aaaaaaaaaaaaaaa");
 	testReversibility("rtj7yt5uj56uy5twesdgs<df");
-//	testReversibilityWithLotsOfRandoms(200, 10);
-//	testReversibilityWithLotsOfRandoms(200, 50);
-//	testReversibilityWithLotsOfRandoms(10, 5000);
+	testReversibilityWithLotsOfRandoms(200, 10);
+	testReversibilityWithLotsOfRandoms(200, 50);
+	testReversibilityWithLotsOfRandoms(10, 5000);
 }
