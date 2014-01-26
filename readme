@@ -1,4 +1,14 @@
 BWT implementation based on http://link.springer.com/chapter/10.1007%2F978-3-319-02432-5_5
 
+creating the genome data:
+-download hg19.2bit from http://genome.ucsc.edu/
+-convert it to .fa format with twoBitToFa: ./twoBitToFa hg19.2bit hg19.fa
+-remove all characters except A, T, C, G and N, and then pick first Gb: tr -cd 'ATCGN' < hg19.fa | head -c 1000000000 > genome1
+
+compiling:
+
 mingw on windows:
 g++ src/bwt.cpp src/main.cpp -std=c++11 -Wall -static -static-libgcc -static-libstdc++
+
+ubuntu 13.10 with gcc 4.8.1:
+g++ src/bwt.cpp src/main.cpp -std=c++11 -Wall

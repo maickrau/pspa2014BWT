@@ -17,10 +17,11 @@ std::vector<size_t> charSums(const Alphabet* text, size_t textLen, size_t maxAlp
 		assert(text[i] < maxAlphabet+1);
 		sums[text[i]]++;
 	}
-	std::vector<size_t> res(maxAlphabet+1, 0);
-	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
-	for (int i = 1; i < maxAlphabet+1; i++)
+	std::vector<size_t> res(maxAlphabet+2, 0);
+	assert(maxAlphabet+2 < std::numeric_limits<int>::max());
+	for (int i = 1; i < maxAlphabet+2; i++)
 	{
+		assert(res[i-1] < std::numeric_limits<size_t>::max()-sums[i-1]);
 		res[i] = res[i-1]+sums[i-1];
 	}
 	return res;
@@ -175,7 +176,7 @@ std::vector<size_t> step3(const Alphabet* text, size_t textLen, size_t maxAlphab
 			size_t jminus1 = j-1;
 			if (j == 0)
 			{
-				jminus1 = textLen-1; //is this right?
+				jminus1 = textLen-1;
 			}
 			assert(j <= textLen);
 			assert(jminus1 <= textLen);
@@ -197,7 +198,7 @@ std::vector<size_t> step3(const Alphabet* text, size_t textLen, size_t maxAlphab
 			size_t jminus1 = j-1;
 			if (j == 0)
 			{
-				jminus1 = textLen-1; //is this right?
+				jminus1 = textLen-1;
 			}
 			assert(j <= textLen);
 			assert(jminus1 <= textLen);
@@ -221,28 +222,67 @@ extern std::vector<size_t> step3(const char* text, size_t textLen, const std::ve
 extern std::vector<size_t> step3(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSRight);
 
 template <class Alphabet>
-bool LMSSubstringsAreEqual(const Alphabet* text, size_t textLen, size_t str1, size_t str2, const std::vector<bool>& LMSSubstringBorder)
+int compareLMSSubstrings(const Alphabet* text, size_t textLen, size_t str1, size_t str2, const std::vector<bool>& LMSSubstringBorder)
 {
 	size_t start = str1;
 	do
 	{
+		if (text[str1] > text[str2])
+		{
+			return 1;
+		}
+		if (text[str1] < text[str2])
+		{
+			return -1;
+		}
 		str1++;
 		str2++;
 		str1 %= textLen;
 		str2 %= textLen;
-		if (LMSSubstringBorder[str1] ^ LMSSubstringBorder[str2])
+		if (LMSSubstringBorder[str1] && !LMSSubstringBorder[str2])
 		{
-			return false;
+			return -1;
+		}
+		if (!LMSSubstringBorder[str1] && LMSSubstringBorder[str2])
+		{
+			return 1;
 		}
 		if (LMSSubstringBorder[str1] && LMSSubstringBorder[str2])
 		{
-			return true;
-		}
-		if (text[str1] != text[str2])
-		{
-			return false;
+			return 0;
 		}
 	} while (str1 != start);
+	assert(false);
+}
+
+template <class Alphabet>
+int compareLMSSuffixes(const Alphabet* text, size_t textLen, size_t str1, size_t str2)
+{
+	do
+	{
+		if (text[str1] > text[str2])
+		{
+			return 1;
+		}
+		if (text[str1] < text[str2])
+		{
+			return -1;
+		}
+		str1++;
+		str2++;
+		if (str1 == textLen && str2 < textLen)
+		{
+			return -1;
+		}
+		if (str1 < textLen && str2 == textLen)
+		{
+			return 1;
+		}
+		if (str1 == textLen && str2 == textLen)
+		{
+			return 0;
+		}
+	} while (true);
 	assert(false);
 }
 
@@ -260,25 +300,31 @@ std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, 
 	std::vector<bool> differentThanLast(LMSLeft.size(), true); //B in paper
 	for (size_t i = 1; i < LMSLeft.size(); i++)
 	{
-		differentThanLast[i] = !LMSSubstringsAreEqual(text, textLen, LMSLeft[i-1], LMSLeft[i], LMSSubstringBorder);
+		differentThanLast[i] = compareLMSSubstrings(text, textLen, LMSLeft[i-1], LMSLeft[i], LMSSubstringBorder) == 0;
 	}
 	//construct R
 	for (size_t i = 0; i < LMSLeft.size(); i++)
 	{
-		size_t pos = LMSLeft[i];
-		do
-		{
-			pos++;
-			pos %= textLen;
-		} while (!LMSSubstringBorder[pos]);
-		assert(pos != 0);
-		ret.second.push_back(pos);
+//		if (differentThanLast[(i+1)%LMSLeft.size()])
+//		{
+			size_t pos = LMSLeft[i];
+			do
+			{
+				pos++;
+				pos %= textLen;
+			} while (!LMSSubstringBorder[pos]);
+			assert(pos != 0);
+			ret.second.push_back(pos);
+//		}
 	}
 	std::vector<size_t> sparseSPrime((textLen+1)/2, 0); //not sure if needs to round up, do it just in case
 	size_t currentName = 0;
 	for (size_t i = 0; i < LMSLeft.size(); i++)
 	{
-		currentName++;
+//		if (differentThanLast[(i)%LMSLeft.size()])
+//		{
+			currentName++;
+//		}
 		assert(LMSLeft[i]/2 < (textLen+1)/2);
 		sparseSPrime[LMSLeft[i]/2] = currentName;
 	}
@@ -303,19 +349,15 @@ std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector
 template <class Alphabet>
 std::vector<size_t> step7(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSLeft, Alphabet* result, const std::vector<size_t>& charSums)
 {
-	assert(charSums.size() >= maxAlphabet+1);
+	assert(charSums.size() > maxAlphabet+1);
 	std::vector<size_t> bucketsS[maxAlphabet+1];
 	std::vector<size_t> buckets[maxAlphabet+1]; //A_l in paper
 	std::vector<size_t> ret; //A_lms,right in paper
 	auto LMSPosition = LMSLeft.begin(); //LMSLeft is A_lms,left in paper
 	assert(LMSPosition != LMSLeft.end());
-	std::vector<size_t> numbersWritten(maxAlphabet+1, 0);
 	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
 	while (LMSPosition != LMSLeft.end())
 	{
-		size_t posminus1 = *LMSPosition-1;
-		assert(*LMSPosition != 0); //first character can't be a LMS type suffix... right?
-		assert(text[posminus1] < maxAlphabet+1);
 		bucketsS[text[*LMSPosition]].push_back(*LMSPosition);
 		LMSPosition++;
 	}
@@ -330,19 +372,14 @@ std::vector<size_t> step7(const Alphabet* text, size_t textLen, size_t maxAlphab
 			{
 				jminus1 = textLen-1;
 			}
+			assert(charSums[text[j]]+i < textLen);
+			assert(i < charSums[text[j]+1]-charSums[text[j]]);
+			result[charSums[text[j]]+i] = text[jminus1];
 			assert(j <= textLen);
 			if (text[jminus1] >= text[j])
 			{
 				assert(text[jminus1] < maxAlphabet+1);
 				buckets[text[jminus1]].push_back(jminus1);
-				size_t charToWrite = jminus1-1;
-				if (jminus1 == 0)
-				{
-					charToWrite = textLen-1;
-				}
-				assert(charSums[text[jminus1]]+numbersWritten[text[jminus1]] < textLen);
-				result[charSums[text[jminus1]]+numbersWritten[text[jminus1]]] = text[charToWrite];
-				numbersWritten[text[jminus1]]++;
 				buckets[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
 			}
 			else
@@ -361,20 +398,14 @@ std::vector<size_t> step7(const Alphabet* text, size_t textLen, size_t maxAlphab
 			assert(j <= textLen);
 			if (text[jminus1] >= text[j])
 			{
+				assert(text[jminus1] > bucket);
 				assert(text[jminus1] < maxAlphabet+1);
 				buckets[text[jminus1]].push_back(jminus1);
-				size_t charToWrite = jminus1-1;
-				if (jminus1 == 0)
-				{
-					charToWrite = textLen-1;
-				}
-				assert(charSums[text[jminus1]]+numbersWritten[text[jminus1]] < textLen);
-				result[charSums[text[jminus1]]+numbersWritten[text[jminus1]]] = text[charToWrite];
-				numbersWritten[text[jminus1]]++;
 				bucketsS[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
 			}
 			else
 			{
+				assert(false);
 				ret.push_back(j);
 			}
 		}
@@ -387,22 +418,15 @@ extern std::vector<size_t> step7(const char* text, size_t textLen, const std::ve
 template <class Alphabet>
 std::vector<size_t> step8(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSRight, Alphabet* result, const std::vector<size_t>& charSums)
 {
-	assert(charSums.size() >= maxAlphabet+1);
+	assert(charSums.size() > maxAlphabet+1);
+	assert(charSums[maxAlphabet+1] == textLen);
 	std::vector<size_t> bucketsL[maxAlphabet+1];
 	std::vector<size_t> buckets[maxAlphabet+1]; //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
 	std::vector<size_t> ret; //A_lms,left in paper, built in reverse order
 	auto LMSPosition = LMSRight.rbegin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
-	std::vector<size_t> numbersWritten(maxAlphabet+1, 0);
 	assert(maxAlphabet < std::numeric_limits<int>::max());
 	while (LMSPosition != LMSRight.rend())
 	{
-		//*LMSPosition can be 0 because it isn't always(ever?) on a LMS substring boundary
-		size_t posminus1 = *LMSPosition-1;
-		if (*LMSPosition == 0)
-		{
-			posminus1 = textLen-1;
-		}
-		assert(text[posminus1] < maxAlphabet+1);
 		bucketsL[text[*LMSPosition]].push_back(*LMSPosition);
 		LMSPosition++;
 	}
@@ -418,22 +442,16 @@ std::vector<size_t> step8(const Alphabet* text, size_t textLen, size_t maxAlphab
 				jminus1 = textLen-1;
 			}
 			assert(j <= textLen);
+			assert(text[j]+1 < maxAlphabet+1);
+			assert(i < charSums[text[j]+1]);
+			assert(i+1 <= charSums[text[j]+1]);
+			assert(i+charSums[text[j]] < charSums[text[j]+1]);
+			assert(charSums[text[j]+1]-i-1 < textLen);
+			result[charSums[text[j]+1]-i-1] = text[jminus1];
 			if (text[jminus1] <= text[j])
 			{
 				assert(text[jminus1] < maxAlphabet+1);
 				buckets[text[jminus1]].push_back(jminus1);
-				size_t charToWrite = jminus1-1;
-				if (jminus1 == 0)
-				{
-					charToWrite = textLen-1;
-				}
-				assert(text[jminus1]+1 < maxAlphabet+1);
-				assert(numbersWritten[text[jminus1]] < charSums[text[jminus1]+1]);
-				assert(numbersWritten[text[jminus1]]+1 <= charSums[text[jminus1]+1]);
-				assert(numbersWritten[text[jminus1]]+charSums[text[jminus1]] < charSums[text[jminus1]+1]);
-				assert(charSums[text[jminus1]+1]-numbersWritten[text[jminus1]]-1 < textLen);
-				result[charSums[text[jminus1]+1]-numbersWritten[text[jminus1]]-1] = text[charToWrite];
-				numbersWritten[text[jminus1]]++;
 				buckets[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
 			}
 			else
@@ -454,23 +472,13 @@ std::vector<size_t> step8(const Alphabet* text, size_t textLen, size_t maxAlphab
 			if (text[jminus1] <= text[j])
 			{
 				assert(text[jminus1] < maxAlphabet+1);
+				assert(text[jminus1] < bucket);
 				buckets[text[jminus1]].push_back(jminus1);
-				size_t charToWrite = jminus1-1;
-				if (jminus1 == 0)
-				{
-					charToWrite = textLen-1;
-				}
-				assert(text[jminus1]+1 < maxAlphabet+1);
-				assert(numbersWritten[text[jminus1]] < charSums[text[jminus1]+1]);
-				assert(numbersWritten[text[jminus1]]+1 <= charSums[text[jminus1]+1]);
-				assert(charSums[text[jminus1]+1]-numbersWritten[text[jminus1]]-1 < textLen);
-				result[charSums[text[jminus1]+1]-numbersWritten[text[jminus1]]-1] = text[charToWrite];
-				numbersWritten[text[jminus1]]++;
 				bucketsL[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
 			}
 			else
 			{
-				assert(j != 0);
+				assert(false);
 				ret.push_back(j);
 			}
 		}	
@@ -480,6 +488,120 @@ std::vector<size_t> step8(const Alphabet* text, size_t textLen, size_t maxAlphab
 }
 extern std::vector<size_t> step8(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSRight, unsigned char* result, const std::vector<size_t>& charSums);
 extern std::vector<size_t> step8(const char* text, size_t textLen, const std::vector<size_t>& LMSRight, char* result, const std::vector<size_t>& charSums);
+
+template <class Alphabet>
+void verifyLMSSubstringsAreSorted(const Alphabet* source, size_t sourceLen, const std::vector<size_t> LMSIndices)
+{
+	std::vector<bool> substringBorders(sourceLen, false);
+	for (auto i = LMSIndices.begin(); i != LMSIndices.end(); i++)
+	{
+		substringBorders[*i] = true;
+	}
+	for (size_t i = 0; i < LMSIndices.size()-1; i++)
+	{
+		int diff = compareLMSSubstrings(source, sourceLen, LMSIndices[i], LMSIndices[i+1], substringBorders);
+		if (diff > 0)
+		{
+			std::cerr << "substring " << i << "/" << LMSIndices.size() << " " << diff << "\n";
+			std::cerr << LMSIndices[i] << " " << LMSIndices[i+1] << "\n";
+		}
+		assert(diff <= 0);
+	}
+}
+
+template <class Alphabet>
+void verifyLMSSuffixesAreSorted(const Alphabet* source, size_t sourceLen, const std::vector<size_t>& LMSIndices)
+{
+	for (size_t i = 0; i < LMSIndices.size()-1; i++)
+	{
+		int diff = compareLMSSuffixes(source, sourceLen, LMSIndices[i], LMSIndices[i+1]);
+		if (diff >= 0)
+		{
+			std::cerr << "\"" << source << "\":\n";
+			for (size_t a = 0; a < LMSIndices.size(); a++)
+			{
+				std::cerr << LMSIndices[a] << " ";
+			}
+			std::cerr << "\nsuffix " << i << "/" << LMSIndices.size() << " " << diff << "\n";
+			std::cerr << LMSIndices[i] << " " << LMSIndices[i+1] << "\n";
+		}
+		assert(diff < 0);
+	}
+}
+
+//debugging only
+template <class Alphabet>
+void forceSuffixOrderSlowSort(const Alphabet* source, size_t sourceLen, std::vector<size_t>& LMSIndices)
+{
+	for (size_t iterations = 0; iterations < LMSIndices.size(); iterations++)
+	{
+		bool swapped = false;
+		for (size_t i = 0; i < LMSIndices.size()-1-iterations; i++)
+		{
+			int diff = compareLMSSuffixes(source, sourceLen, LMSIndices[i], LMSIndices[i+1]);
+			if (diff > 0)
+			{
+				swapped = true;
+				std::swap(LMSIndices[i], LMSIndices[i+1]);
+			}
+		}
+		if (iterations % 100 == 0)
+		{
+//			std::cerr << iterations << "/" << LMSIndices.size() << "\n";
+		}
+		if (!swapped)
+		{
+			break;
+		}
+	}
+}
+
+//debugging only, doesn't actually sort them correctly but does almost correctly
+template <class Alphabet>
+void forceSuffixOrderMergeSort(const Alphabet* source, size_t sourceLen, std::vector<size_t>& LMSIndices)
+{
+	for (size_t mergeSize = 1; mergeSize < LMSIndices.size()/2; mergeSize *= 2)
+	{
+		std::vector<size_t> merged(mergeSize*2, 0);
+		for (size_t start = 0; start < LMSIndices.size(); start += mergeSize*2)
+		{
+			size_t mergeIndex = 0;
+			size_t left = start;
+			size_t right = start+mergeSize;
+			while (left < start+mergeSize && right < start+2*mergeSize && right < LMSIndices.size())
+			{
+				int diff = compareLMSSuffixes(source, sourceLen, LMSIndices[left], LMSIndices[right]);
+				if (diff < 0)
+				{
+					merged[mergeIndex] = LMSIndices[left];
+					left++;
+				}
+				else
+				{
+					merged[mergeIndex] = LMSIndices[right];
+					right++;
+				}
+				mergeIndex++;
+			}
+			while (left < start+mergeSize && left < LMSIndices.size())
+			{
+				merged[mergeIndex] = LMSIndices[left];
+				mergeIndex++;
+				left++;
+			}
+			while (right < start+2*mergeSize && right < LMSIndices.size())
+			{
+				merged[mergeIndex] = LMSIndices[right];
+				mergeIndex++;
+				right++;
+			}
+			for (size_t i = start; i < start+2*mergeSize && i < LMSIndices.size(); i++)
+			{
+				LMSIndices[i] = merged[i-start];
+			}
+		}
+	}
+}
 
 //maxAlphabet is the largest alphabet that appears in the source
 //for unsigned char use maxAlphabet == 255
@@ -491,11 +613,46 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	auto first = step1(source, sourceLen, maxAlphabet);
 	auto second = step2(source, sourceLen, maxAlphabet, first);
 	auto third = step3(source, sourceLen, maxAlphabet, second);
+//	verifyLMSSubstringsAreSorted(source, sourceLen, third);
 	auto fourth = step4(source, sourceLen, maxAlphabet, third);
 	auto fifth = step5(fourth.first);
 	auto sixth = step6(fifth, fourth.second);
+//	verifyLMSSuffixesAreSorted(source, sourceLen, sixth);
+	forceSuffixOrderMergeSort(source, sourceLen, sixth);
+	forceSuffixOrderSlowSort(source, sourceLen, sixth);
+	verifyLMSSuffixesAreSorted(source, sourceLen, sixth);
+//	forceSuffixOrderSlowSort(source, sourceLen, first);
+//	verifyLMSSuffixesAreSorted(source, sourceLen, first);
+	std::vector<bool> sevenWrote(sourceLen, false);
+	std::vector<bool> eightWrote(sourceLen, false);
 	auto seventh = step7(source, sourceLen, maxAlphabet, sixth, dest, charSum);
+//	auto seventh = step7(source, sourceLen, maxAlphabet, first, dest, charSum);
+	for (size_t i = 0; i < sourceLen; i++)
+	{
+		if (dest[i] != 0)
+		{
+			sevenWrote[i] = true;
+		}
+	}
 	step8(source, sourceLen, maxAlphabet, seventh, dest, charSum);
+	for (size_t i = 0; i < sourceLen; i++)
+	{
+		if (!sevenWrote[i] && dest[i] != 0)
+		{
+			eightWrote[i] = true;
+		}
+	}/*
+	for (size_t i = 0; i < sourceLen; i++)
+	{
+		if (sevenWrote[i])
+		{
+			std::cerr << "s" << i << " ";
+		}
+		if (eightWrote[i])
+		{
+			std::cerr << "e" << i << " ";
+		}
+	}*/
 }
 
 extern void bwt(const char* source, size_t sourceLen, char* dest);
@@ -510,13 +667,45 @@ void inverseBWT(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Al
 	for (size_t i = 0; i < sourceLen; i++)
 	{
 		assert(source[i] < maxAlphabet+1);
+		assert(charSum[source[i]] < std::numeric_limits<size_t>::max()-usedCharacters[source[i]]);
 		LFmapping[i] = charSum[source[i]]+usedCharacters[source[i]];
+		if (source[i] < maxAlphabet)
+		{
+			assert(usedCharacters[source[i]] < charSum[source[i]+1]-charSum[source[i]]);
+		}
+		else
+		{
+			assert(usedCharacters[source[i]] < sourceLen-charSum[source[i]]);
+		}
 		usedCharacters[source[i]]++;
 		if (source[i] == 0)
 		{
+			assert(index == 0);
 			index = i;
 		}
 	}
+	for (size_t i = 0; i < maxAlphabet; i++)
+	{
+		assert(usedCharacters[i] == charSum[i+1]-charSum[i]);
+	}
+	assert(usedCharacters[maxAlphabet] == sourceLen-charSum[maxAlphabet]);
+/*	assert(index != 0);
+	size_t visitor = index;
+	size_t numVisited = 0;
+	std::vector<bool> visited(sourceLen, false);
+	do
+	{
+		assert(!visited[visitor]);
+		visited[visitor] = true;
+		visitor = LFmapping[visitor];
+		assert(numVisited < sourceLen);
+		numVisited++;
+	} while (visitor != index);
+	if (numVisited != sourceLen)
+	{
+		std::cerr << "visited " << numVisited << "/" << sourceLen << "\n";
+	}
+	assert(numVisited == sourceLen);*/
 	size_t loc = sourceLen-1;
 	do
 	{

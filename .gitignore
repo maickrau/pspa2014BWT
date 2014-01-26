@@ -19,3 +19,9 @@
 *.exe
 *.out
 *.app
+
+# big genome files
+minigenome
+genome1
+genome2
+genome3

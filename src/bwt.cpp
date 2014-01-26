@@ -121,8 +121,10 @@ std::vector<size_t> step5(const std::vector<size_t>& Sprime)
 	{
 		return bwtDirectly(Sprime);
 	}
+	assert(false); //modification to the algorithm, all names are unique so can always calculate directly
 	size_t* rawResult = new size_t[Sprime.size()]();
-	bwt(Sprime.data(), Sprime.size(), Sprime.size()+1, rawResult); //not sure if Sprime.size() is the largest actually used alphabet, add +1 to make sure
+	auto max = std::max_element(Sprime.begin(), Sprime.end());
+	bwt(Sprime.data(), Sprime.size(), *max, rawResult);
 	std::vector<size_t> result;
 	for (size_t i = 0; i < Sprime.size(); i++)
 	{
