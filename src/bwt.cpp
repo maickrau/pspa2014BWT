@@ -2,7 +2,7 @@
 #include <algorithm>
 
 #include "bwt.h"
-
+/*
 std::vector<size_t> step1(const char* text, size_t textLen)
 {
 	return step1<unsigned char>((const unsigned char*)text, textLen, 255);
@@ -12,7 +12,7 @@ std::vector<size_t> step1(const unsigned char* text, size_t textLen)
 {
 	return step1<unsigned char>((const unsigned char*)text, textLen, 255);
 }
-
+*/
 std::vector<size_t> step2(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft)
 {
 	return step2<unsigned char>((const unsigned char*)text, textLen, 255, LMSLeft);
@@ -32,7 +32,7 @@ std::vector<size_t> step3(const unsigned char* text, size_t textLen, const std::
 {
 	return step3<unsigned char>((const unsigned char*)text, textLen, 255, LMSRight);
 }
-
+/*
 std::pair<std::vector<size_t>, std::vector<size_t>> step4(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft)
 {
 	return step4<unsigned char>((const unsigned char*)text, textLen, 255, LMSLeft);
@@ -42,7 +42,7 @@ std::pair<std::vector<size_t>, std::vector<size_t>> step4(const unsigned char* t
 {
 	return step4<unsigned char>((const unsigned char*)text, textLen, 255, LMSLeft);
 }
-
+*/
 std::vector<size_t> step7(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSLeft, unsigned char* result, const std::vector<size_t>& charSums)
 {
 	return step7<unsigned char>((const unsigned char*)text, textLen, 255, LMSLeft, (unsigned char*)result, charSums);

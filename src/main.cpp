@@ -84,7 +84,7 @@ void testEqualityAndWhine(const char* step, const char* text1, const char* text2
 		std::cerr << "\n";
 	}
 }
-
+/*
 void testStep1(const char* text, size_t textlen, const std::vector<size_t>& wantedResult)
 {
 	std::vector<size_t> result = step1(text, textlen);
@@ -301,16 +301,16 @@ void testSteps5()
 		}
 	}
 	testCharSums(testString, testStringLen, wantedCharSums);
-	std::vector<size_t> wanted { 9, 7, 5, 3, 1 };
+	std::vector<size_t> wanted { 9, 1, 3, 5, 7 };
 	testStep1(testString, testStringLen, wanted);
-	std::vector<size_t> wanted2 { 8, 6, 2, 0, 4 };
+	std::vector<size_t> wanted2 { 8, 2, 6, 0, 4 };
 	testStep2(testString, testStringLen, wanted, wanted2);
-	std::vector<size_t> wanted3 { 9, 7, 5, 1, 3 };
+	std::vector<size_t> wanted3 { 9, 7, 1, 5, 3 };
 	testStep3(testString, testStringLen, wanted2, wanted3);
-	std::vector<size_t> wantedR { 1, 9, 7, 3, 5 };
-	std::vector<size_t> wanted4 { 3, 4, 2, 1, 0 };
+	std::vector<size_t> wantedR { 1, 9, 3, 7, 5 };
+	std::vector<size_t> wanted4 { 2, 4, 3, 1, 0 };
 	testStep4(testString, testStringLen, wanted3, wanted4, wantedR);
-	std::vector<size_t> wanted5 { 1, 2, 4, 0, 3 };
+	std::vector<size_t> wanted5 { 1, 3, 0, 4, 2 };
 	testStep5(testString, testStringLen, wanted4, wanted5);
 	std::vector<size_t> wanted6 { 9, 7, 5, 1, 3 };
 	testStep6(testString, testStringLen, wanted5, wantedR, wanted6);
@@ -320,7 +320,7 @@ void testSteps5()
 //	testStep8(testString, testStringLen, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", wanted7, wantedCharSums);
 
 }
-
+*/
 void testBWT2()
 {
 	const char testString[7] { 2, 3, 4, 3, 5, 1, 0 };
@@ -522,6 +522,7 @@ void doTests()
 	testReversibility("23t34qy3qt3qat4a");
 	testReversibility("aaaaaaaaaaaaaaa");
 	testReversibility("rtj7yt5uj56uy5twesdgs<df");
+	testReversibility("cabadabab");
 
 	testReversibilityWithBigBroken();
 

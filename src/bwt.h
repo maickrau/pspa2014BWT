@@ -32,7 +32,7 @@ extern std::vector<size_t> charSums(const unsigned char* text, size_t textLen);
 
 //find LMS-type suffixes in text, return a vector of their indices
 template <class Alphabet>
-std::vector<size_t> step1(const Alphabet* text, size_t textLen, size_t maxAlphabet)
+std::vector<size_t> step1(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::vector<bool>& isS)
 {
 	assert(textLen > 0);
 	std::vector<size_t> buckets[maxAlphabet+1];
@@ -41,6 +41,7 @@ std::vector<size_t> step1(const Alphabet* text, size_t textLen, size_t maxAlphab
 	//i > 0 because 0 can never be LMS-type
 	for (size_t i = textLen-1; i > 0; i--)
 	{
+		isS[i] = isSType;
 		bool nextIsSType;
 		if (text[i-1] < text[i])
 		{
@@ -63,6 +64,7 @@ std::vector<size_t> step1(const Alphabet* text, size_t textLen, size_t maxAlphab
 			equalIsSType = text[i-1] < text[i];
 		}
 		isSType = nextIsSType;
+		isS[i-1] = isSType;
 	}
 	std::vector<size_t> ret; //A_lms, left in paper
 	//indices were inserted in reverse order, reverse the vector to get them in right order
@@ -75,8 +77,8 @@ std::vector<size_t> step1(const Alphabet* text, size_t textLen, size_t maxAlphab
 	return ret;
 }
 
-extern std::vector<size_t> step1(const char* text, size_t textLen);
-extern std::vector<size_t> step1(const unsigned char* text, size_t textLen);
+//extern std::vector<size_t> step1(const char* text, size_t textLen);
+//extern std::vector<size_t> step1(const unsigned char* text, size_t textLen);
 
 //sorts (with step 3) the LMS-type substrings
 template <class Alphabet>
@@ -90,9 +92,8 @@ std::vector<size_t> step2(const Alphabet* text, size_t textLen, size_t maxAlphab
 	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
 	while (LMSPosition != LMSLeft.end())
 	{
-		assert(*LMSPosition != 0);
-		assert(*LMSPosition-1 < textLen);
-		assert(text[*LMSPosition-1] < maxAlphabet+1);
+		assert(*LMSPosition < textLen);
+		assert(text[*LMSPosition] <= maxAlphabet);
 		bucketsS[text[*LMSPosition]].push_back(*LMSPosition);
 		LMSPosition++;
 	}
@@ -105,7 +106,7 @@ std::vector<size_t> step2(const Alphabet* text, size_t textLen, size_t maxAlphab
 			size_t jminus1 = j-1;
 			if (j == 0)
 			{
-				jminus1 = textLen-1; //is this right?
+				jminus1 = textLen-1;
 			}
 			assert(j <= textLen);
 			if (text[jminus1] >= text[j])
@@ -125,17 +126,23 @@ std::vector<size_t> step2(const Alphabet* text, size_t textLen, size_t maxAlphab
 			size_t jminus1 = j-1;
 			if (j == 0)
 			{
-				jminus1 = textLen-1; //is this right?
+				jminus1 = textLen-1;
 			}
 			assert(j <= textLen);
 			if (text[jminus1] >= text[j])
 			{
+				if (text[jminus1] == bucket)
+				{
+					std::cerr << text << "\n" << j << ", " << jminus1 << ", " << bucket << ", " << (int)text[jminus1] << "\n";
+				}
+				assert(text[jminus1] > bucket);
 				assert(text[jminus1] < maxAlphabet+1);
 				buckets[text[jminus1]].push_back(jminus1);
 				bucketsS[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
 			}
 			else
 			{
+				assert(false);
 				ret.push_back(j);
 			}
 		}
@@ -157,13 +164,8 @@ std::vector<size_t> step3(const Alphabet* text, size_t textLen, size_t maxAlphab
 	assert(maxAlphabet < std::numeric_limits<int>::max());
 	while (LMSPosition != LMSRight.rend())
 	{
-		//*LMSPosition can be 0 because it isn't always(ever?) on a LMS substring boundary
-		size_t pushThis = *LMSPosition-1;
-		if (*LMSPosition == 0)
-		{
-			pushThis = textLen-1;
-		}
-		assert(text[pushThis] < maxAlphabet+1);
+		assert(*LMSPosition < textLen);
+		assert(text[*LMSPosition] <= maxAlphabet);
 		bucketsL[text[*LMSPosition]].push_back(*LMSPosition);
 		LMSPosition++;
 	}
@@ -179,7 +181,7 @@ std::vector<size_t> step3(const Alphabet* text, size_t textLen, size_t maxAlphab
 				jminus1 = textLen-1;
 			}
 			assert(j <= textLen);
-			assert(jminus1 <= textLen);
+			assert(text[j]+1 < maxAlphabet+1);
 			if (text[jminus1] <= text[j])
 			{
 				assert(text[jminus1] < maxAlphabet+1);
@@ -201,19 +203,19 @@ std::vector<size_t> step3(const Alphabet* text, size_t textLen, size_t maxAlphab
 				jminus1 = textLen-1;
 			}
 			assert(j <= textLen);
-			assert(jminus1 <= textLen);
 			if (text[jminus1] <= text[j])
 			{
 				assert(text[jminus1] < maxAlphabet+1);
+				assert(text[jminus1] < bucket);
 				buckets[text[jminus1]].push_back(jminus1);
 				bucketsL[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
 			}
 			else
 			{
-				assert(j != 0);
+				assert(false);
 				ret.push_back(j);
 			}
-		}
+		}	
 	}
 	std::reverse(ret.begin(), ret.end());
 	return ret;
@@ -222,7 +224,7 @@ extern std::vector<size_t> step3(const char* text, size_t textLen, const std::ve
 extern std::vector<size_t> step3(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSRight);
 
 template <class Alphabet>
-int compareLMSSubstrings(const Alphabet* text, size_t textLen, size_t str1, size_t str2, const std::vector<bool>& LMSSubstringBorder)
+int compareLMSSubstrings(const Alphabet* text, size_t textLen, size_t str1, size_t str2, const std::vector<bool>& LMSSubstringBorder, const std::vector<bool>& isSType)
 {
 	size_t start = str1;
 	do
@@ -235,10 +237,14 @@ int compareLMSSubstrings(const Alphabet* text, size_t textLen, size_t str1, size
 		{
 			return -1;
 		}
-		str1++;
-		str2++;
-		str1 %= textLen;
-		str2 %= textLen;
+		if (isSType[str1] && !isSType[str2])
+		{
+			return 1;
+		}
+		if (!isSType[str1] && isSType[str2])
+		{
+			return -1;
+		}
 		if (LMSSubstringBorder[str1] && !LMSSubstringBorder[str2])
 		{
 			return -1;
@@ -247,10 +253,14 @@ int compareLMSSubstrings(const Alphabet* text, size_t textLen, size_t str1, size
 		{
 			return 1;
 		}
-		if (LMSSubstringBorder[str1] && LMSSubstringBorder[str2])
+		if (LMSSubstringBorder[str1] && LMSSubstringBorder[str2] && str1 != start)
 		{
 			return 0;
 		}
+		str1++;
+		str2++;
+		str1 %= textLen;
+		str2 %= textLen;
 	} while (str1 != start);
 	assert(false);
 }
@@ -288,7 +298,7 @@ int compareLMSSuffixes(const Alphabet* text, size_t textLen, size_t str1, size_t
 
 //return.first is S', return.second is R
 template <class Alphabet>
-std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSLeft)
+std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSLeft, const std::vector<bool>& isSType)
 {
 	std::pair<std::vector<size_t>, std::vector<size_t>> ret;
 	std::vector<bool> LMSSubstringBorder(textLen, false);
@@ -300,8 +310,27 @@ std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, 
 	std::vector<bool> differentThanLast(LMSLeft.size(), true); //B in paper
 	for (size_t i = 1; i < LMSLeft.size(); i++)
 	{
-		differentThanLast[i] = compareLMSSubstrings(text, textLen, LMSLeft[i-1], LMSLeft[i], LMSSubstringBorder) == 0;
+		differentThanLast[i] = compareLMSSubstrings(text, textLen, LMSLeft[i-1], LMSLeft[i], LMSSubstringBorder, isSType) != 0;
+	}/*
+	std::cerr << "A_lms,left:\n";
+	for (size_t i = 0; i < LMSLeft.size(); i++)
+	{
+		std::cerr << LMSLeft[i] << " ";
 	}
+	std::cerr << "\n";
+	std::cerr << "R:\n";
+	for (size_t i = 0; i < LMSLeft.size(); i++)
+	{
+		if (differentThanLast[i])
+		{
+			std::cerr << "1 ";
+		}
+		else
+		{
+			std::cerr << "0 ";
+		}
+	}
+	std::cerr << "\n";*/
 	//construct R
 	for (size_t i = 0; i < LMSLeft.size(); i++)
 	{
@@ -337,8 +366,8 @@ std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, 
 	}
 	return ret;
 }
-extern std::pair<std::vector<size_t>, std::vector<size_t>> step4(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft);
-extern std::pair<std::vector<size_t>, std::vector<size_t>> step4(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSLeft);
+//extern std::pair<std::vector<size_t>, std::vector<size_t>> step4(const char* text, size_t textLen, const std::vector<size_t>& LMSLeft);
+//extern std::pair<std::vector<size_t>, std::vector<size_t>> step4(const unsigned char* text, size_t textLen, const std::vector<size_t>& LMSLeft);
 
 std::vector<size_t> bwtDirectly(const std::vector<size_t>& data);
 
@@ -490,7 +519,7 @@ extern std::vector<size_t> step8(const unsigned char* text, size_t textLen, cons
 extern std::vector<size_t> step8(const char* text, size_t textLen, const std::vector<size_t>& LMSRight, char* result, const std::vector<size_t>& charSums);
 
 template <class Alphabet>
-void verifyLMSSubstringsAreSorted(const Alphabet* source, size_t sourceLen, const std::vector<size_t> LMSIndices)
+void verifyLMSSubstringsAreSorted(const Alphabet* source, size_t sourceLen, const std::vector<size_t>& LMSIndices, const std::vector<bool>& isSType)
 {
 	std::vector<bool> substringBorders(sourceLen, false);
 	for (auto i = LMSIndices.begin(); i != LMSIndices.end(); i++)
@@ -499,7 +528,7 @@ void verifyLMSSubstringsAreSorted(const Alphabet* source, size_t sourceLen, cons
 	}
 	for (size_t i = 0; i < LMSIndices.size()-1; i++)
 	{
-		int diff = compareLMSSubstrings(source, sourceLen, LMSIndices[i], LMSIndices[i+1], substringBorders);
+		int diff = compareLMSSubstrings(source, sourceLen, LMSIndices[i], LMSIndices[i+1], substringBorders, isSType);
 		if (diff > 0)
 		{
 			std::cerr << "substring " << i << "/" << LMSIndices.size() << " " << diff << "\n";
@@ -515,7 +544,7 @@ void verifyLMSSuffixesAreSorted(const Alphabet* source, size_t sourceLen, const 
 	for (size_t i = 0; i < LMSIndices.size()-1; i++)
 	{
 		int diff = compareLMSSuffixes(source, sourceLen, LMSIndices[i], LMSIndices[i+1]);
-		if (diff >= 0)
+		if (diff > 0)
 		{
 			std::cerr << "\"" << source << "\":\n";
 			for (size_t a = 0; a < LMSIndices.size(); a++)
@@ -525,7 +554,7 @@ void verifyLMSSuffixesAreSorted(const Alphabet* source, size_t sourceLen, const 
 			std::cerr << "\nsuffix " << i << "/" << LMSIndices.size() << " " << diff << "\n";
 			std::cerr << LMSIndices[i] << " " << LMSIndices[i+1] << "\n";
 		}
-		assert(diff < 0);
+		assert(diff <= 0);
 	}
 }
 
@@ -608,13 +637,20 @@ void forceSuffixOrderMergeSort(const Alphabet* source, size_t sourceLen, std::ve
 //for larger alphabets (eg. size_t), take the largest number that actually appears and use that
 template <class Alphabet>
 void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet* dest)
-{
+{/*
+	std::cerr << "bwt " << sourceLen << " " << maxAlphabet << "\n";
+	for (size_t i = 0; i < sourceLen; i++)
+	{
+		std::cerr << source[i] << " ";
+	}
+	std::cerr << "\n";*/
+	std::vector<bool> isSType(sourceLen, false);
 	auto charSum = charSums(source, sourceLen, maxAlphabet);
-	auto first = step1(source, sourceLen, maxAlphabet);
+	auto first = step1(source, sourceLen, maxAlphabet, isSType);
 	auto second = step2(source, sourceLen, maxAlphabet, first);
 	auto third = step3(source, sourceLen, maxAlphabet, second);
-//	verifyLMSSubstringsAreSorted(source, sourceLen, third);
-	auto fourth = step4(source, sourceLen, maxAlphabet, third);
+	verifyLMSSubstringsAreSorted(source, sourceLen, third, isSType);
+	auto fourth = step4(source, sourceLen, maxAlphabet, third, isSType);
 	auto fifth = step5(fourth.first);
 	auto sixth = step6(fifth, fourth.second);
 //	verifyLMSSuffixesAreSorted(source, sourceLen, sixth);
