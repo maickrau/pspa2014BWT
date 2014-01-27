@@ -301,42 +301,22 @@ int compareLMSSuffixes(const Alphabet* text, size_t textLen, size_t str1, size_t
 	assert(false);
 }
 
-//return.first is S', return.second is R
+//returns S'
 template <class Alphabet>
-std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSLeft, const std::vector<bool>& isSType)
+std::vector<size_t> step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSLeft, const std::vector<bool>& isSType)
 {
-	std::pair<std::vector<size_t>, std::vector<size_t>> ret;
+	std::vector<size_t> ret;
 	std::vector<bool> LMSSubstringBorder(textLen, false);
 	for (auto i = LMSLeft.begin(); i != LMSLeft.end(); i++)
 	{
 		assert(*i < textLen);
 		LMSSubstringBorder[*i] = true;
 	}
-	std::vector<bool> differentThanLast(LMSLeft.size(), true); //B in paper
-	for (size_t i = 1; i < LMSLeft.size(); i++)
-	{
-		differentThanLast[i] = compareLMSSubstrings(text, textLen, LMSLeft[i-1], LMSLeft[i], LMSSubstringBorder, isSType) != 0;
-	}
-	//construct R
-	for (size_t i = 0; i < LMSLeft.size(); i++)
-	{
-		if (differentThanLast[(i+1)%LMSLeft.size()])
-		{
-			size_t pos = LMSLeft[i];
-			do
-			{
-				pos++;
-				pos %= textLen;
-			} while (!LMSSubstringBorder[pos]);
-			assert(pos != 0);
-			ret.second.push_back(pos);
-		}
-	}
 	std::vector<size_t> sparseSPrime((textLen+1)/2, 0); //not sure if needs to round up, do it just in case
 	size_t currentName = 0;
 	for (size_t i = 0; i < LMSLeft.size(); i++)
 	{
-		if (differentThanLast[(i)%LMSLeft.size()])
+		if (i == 0 || compareLMSSubstrings(text, textLen, LMSLeft[i-1], LMSLeft[i], LMSSubstringBorder, isSType) != 0)
 		{
 			currentName++;
 		}
@@ -347,7 +327,7 @@ std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, 
 	{
 		if (*i != 0)
 		{
-			ret.first.push_back(*i-1);
+			ret.push_back(*i-1);
 		}
 	}
 	return ret;
@@ -450,13 +430,12 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	auto first = step1(source, sourceLen, maxAlphabet, isSType);
 	auto second = step2or7(source, sourceLen, maxAlphabet, first, (Alphabet*)nullptr, charSum);
 	auto third = step3or8(source, sourceLen, maxAlphabet, second, (Alphabet*)nullptr, charSum);
-	verifyLMSSubstringsAreSorted(source, sourceLen, third, isSType);
+//	verifyLMSSubstringsAreSorted(source, sourceLen, third, isSType);
 	auto fourth = step4(source, sourceLen, maxAlphabet, third, isSType);
-	auto fifth = step5(fourth.first);
+	auto fifth = step5(fourth);
 	auto SAinverse = alternateStep6a(fifth);
 	auto sixth = alternateStep6b(source, sourceLen, maxAlphabet, SAinverse);
-//	auto sixth = step6(fifth, fourth.second);
-	verifyLMSSuffixesAreSorted(source, sourceLen, sixth);
+//	verifyLMSSuffixesAreSorted(source, sourceLen, sixth);
 	std::vector<bool> sevenWrote(sourceLen, false);
 	std::vector<bool> eightWrote(sourceLen, false);
 	auto seventh = step2or7(source, sourceLen, maxAlphabet, sixth, dest, charSum);
