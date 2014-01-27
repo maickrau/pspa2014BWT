@@ -32,7 +32,7 @@ template <class Alphabet>
 std::vector<size_t> step1(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::vector<bool>& isS)
 {
 	assert(textLen > 0);
-	std::vector<size_t> buckets[maxAlphabet+1];
+	std::vector<std::vector<size_t>> buckets(maxAlphabet+1);
 	bool isSType = true; //last character is always s-type
 	bool equalIsSType = false; //if text[i] == text[i-1], is text[i-1] s-type?
 	//i > 0 because 0 can never be LMS-type
@@ -79,8 +79,8 @@ std::vector<size_t> step1(const Alphabet* text, size_t textLen, size_t maxAlphab
 template <class Alphabet>
 std::vector<size_t> step2or7(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSLeft, Alphabet* result, const std::vector<size_t>& charSum)
 {
-	std::vector<size_t> bucketsS[maxAlphabet+1];
-	std::vector<size_t> buckets[maxAlphabet+1]; //A_l in paper
+	std::vector<std::vector<size_t>> bucketsS(maxAlphabet+1);
+	std::vector<std::vector<size_t>> buckets(maxAlphabet+1); //A_l in paper
 	std::vector<size_t> ret; //A_lms,right in paper
 	auto LMSPosition = LMSLeft.begin(); //LMSLeft is A_lms,left in paper
 	assert(LMSPosition != LMSLeft.end());
@@ -156,8 +156,8 @@ std::vector<size_t> step2or7(const Alphabet* text, size_t textLen, size_t maxAlp
 template <class Alphabet>
 std::vector<size_t> step3or8(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSRight, Alphabet* result, const std::vector<size_t>& charSum)
 {
-	std::vector<size_t> bucketsL[maxAlphabet+1];
-	std::vector<size_t> buckets[maxAlphabet+1]; //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
+	std::vector<std::vector<size_t>> bucketsL(maxAlphabet+1);
+	std::vector<std::vector<size_t>> buckets(maxAlphabet+1); //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
 	std::vector<size_t> ret; //A_lms,left in paper, built in reverse order
 	auto LMSPosition = LMSRight.rbegin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
 	assert(maxAlphabet < std::numeric_limits<int>::max());
@@ -312,16 +312,16 @@ std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, 
 		assert(*i < textLen);
 		LMSSubstringBorder[*i] = true;
 	}
-/*	std::vector<bool> differentThanLast(LMSLeft.size(), true); //B in paper
+	std::vector<bool> differentThanLast(LMSLeft.size(), true); //B in paper
 	for (size_t i = 1; i < LMSLeft.size(); i++)
 	{
 		differentThanLast[i] = compareLMSSubstrings(text, textLen, LMSLeft[i-1], LMSLeft[i], LMSSubstringBorder, isSType) != 0;
-	}*/
+	}
 	//construct R
 	for (size_t i = 0; i < LMSLeft.size(); i++)
 	{
-//		if (differentThanLast[(i+1)%LMSLeft.size()])
-//		{
+		if (differentThanLast[(i+1)%LMSLeft.size()])
+		{
 			size_t pos = LMSLeft[i];
 			do
 			{
@@ -330,16 +330,16 @@ std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, 
 			} while (!LMSSubstringBorder[pos]);
 			assert(pos != 0);
 			ret.second.push_back(pos);
-//		}
+		}
 	}
 	std::vector<size_t> sparseSPrime((textLen+1)/2, 0); //not sure if needs to round up, do it just in case
 	size_t currentName = 0;
 	for (size_t i = 0; i < LMSLeft.size(); i++)
 	{
-//		if (differentThanLast[(i)%LMSLeft.size()])
-//		{
+		if (differentThanLast[(i)%LMSLeft.size()])
+		{
 			currentName++;
-//		}
+		}
 		assert(LMSLeft[i]/2 < (textLen+1)/2);
 		sparseSPrime[LMSLeft[i]/2] = currentName;
 	}
@@ -356,6 +356,48 @@ std::pair<std::vector<size_t>, std::vector<size_t>> step4(const Alphabet* text, 
 std::vector<size_t> step5(const std::vector<size_t>& Sprime);
 
 std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector<size_t>& R);
+
+std::vector<size_t> alternateStep6a(const std::vector<size_t>& BWTprime);
+
+template <class Alphabet>
+std::vector<size_t> alternateStep6b(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& SAinverse)
+{
+	assert(textLen > 0);
+	std::vector<size_t> ret(SAinverse.size(), 0);
+	bool isSType = true; //last character is always s-type
+	bool equalIsSType = false; //if text[i] == text[i-1], is text[i-1] s-type?
+	//i > 0 because 0 can never be LMS-type
+	size_t SAindex = SAinverse.size(); //+1 to notice underflow
+	for (size_t i = textLen-1; i > 0; i--)
+	{
+		bool nextIsSType;
+		if (text[i-1] < text[i])
+		{
+			nextIsSType = true;
+		}
+		else if (text[i-1] > text[i])
+		{
+			nextIsSType = false;
+		}
+		else
+		{
+			nextIsSType = equalIsSType;
+		}
+		if (isSType && !nextIsSType)
+		{
+			assert(SAindex > 0);
+			ret[SAinverse[SAindex-1]] = i;
+			SAindex--;
+		}
+		if (text[i-1] != text[i])
+		{
+			equalIsSType = text[i-1] < text[i];
+		}
+		isSType = nextIsSType;
+	}
+	assert(SAindex == 0);
+	return ret;
+}
 
 template <class Alphabet>
 void verifyLMSSubstringsAreSorted(const Alphabet* source, size_t sourceLen, const std::vector<size_t>& LMSIndices, const std::vector<bool>& isSType)
@@ -411,8 +453,9 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	verifyLMSSubstringsAreSorted(source, sourceLen, third, isSType);
 	auto fourth = step4(source, sourceLen, maxAlphabet, third, isSType);
 	auto fifth = step5(fourth.first);
-	auto sixth = step6(fifth, fourth.second);
-	std::sort(sixth.begin(), sixth.end(), [&, source, sourceLen](size_t left, size_t right) -> bool { return compareLMSSuffixes(source, sourceLen, left, right) < 0; });
+	auto SAinverse = alternateStep6a(fifth);
+	auto sixth = alternateStep6b(source, sourceLen, maxAlphabet, SAinverse);
+//	auto sixth = step6(fifth, fourth.second);
 	verifyLMSSuffixesAreSorted(source, sourceLen, sixth);
 	std::vector<bool> sevenWrote(sourceLen, false);
 	std::vector<bool> eightWrote(sourceLen, false);
