@@ -8,6 +8,12 @@
 #include <limits>
 #include <iostream>
 
+template <class O>
+void freeMemory(O& o)
+{
+	O().swap(o);
+}
+
 template <class Alphabet>
 std::vector<size_t> charSums(const Alphabet* text, size_t textLen, size_t maxAlphabet)
 {
@@ -429,16 +435,20 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	auto charSum = charSums(source, sourceLen, maxAlphabet);
 	auto first = step1(source, sourceLen, maxAlphabet, isSType);
 	auto second = step2or7(source, sourceLen, maxAlphabet, first, (Alphabet*)nullptr, charSum);
+	freeMemory(first);
 	auto third = step3or8(source, sourceLen, maxAlphabet, second, (Alphabet*)nullptr, charSum);
-//	verifyLMSSubstringsAreSorted(source, sourceLen, third, isSType);
+	freeMemory(second);
+	verifyLMSSubstringsAreSorted(source, sourceLen, third, isSType);
 	auto fourth = step4(source, sourceLen, maxAlphabet, third, isSType);
+	freeMemory(third);
 	auto fifth = step5(fourth);
 	auto SAinverse = alternateStep6a(fifth);
+	freeMemory(fifth);
 	auto sixth = alternateStep6b(source, sourceLen, maxAlphabet, SAinverse);
-//	verifyLMSSuffixesAreSorted(source, sourceLen, sixth);
-	std::vector<bool> sevenWrote(sourceLen, false);
-	std::vector<bool> eightWrote(sourceLen, false);
+	freeMemory(SAinverse);
+	verifyLMSSuffixesAreSorted(source, sourceLen, sixth);
 	auto seventh = step2or7(source, sourceLen, maxAlphabet, sixth, dest, charSum);
+	freeMemory(sixth);
 	step3or8(source, sourceLen, maxAlphabet, seventh, dest, charSum);
 }
 
