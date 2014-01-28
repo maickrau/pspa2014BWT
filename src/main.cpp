@@ -257,6 +257,28 @@ void testReversibilityWithBigBroken()
 	delete [] inverse;
 }
 
+void testReversibilityWithFile(const char* fileName)
+{
+	std::ifstream file(fileName, std::ifstream::binary);
+	file.seekg(0, std::ifstream::end);
+	size_t size = file.tellg();
+//	std::cerr << size;
+	file.seekg(0, std::ifstream::beg);
+	char* source = new (std::nothrow) char[size+1](); //+1 for trailing \0
+	file.read(source, size);
+	file.close();
+	std::cerr << "Testing reversibility of file \"" << fileName << "\", size " << size << "+1\n";
+	if (isReversible(source, size+1))
+	{
+		std::cerr << "file \"" << fileName << "\" reversible\n";
+	}
+	else
+	{
+		std::cerr << "file \"" << fileName << "\" NOT reversible\n";
+	}
+	delete [] source;
+}
+
 void doTests()
 {
 	testBWT();
@@ -334,28 +356,6 @@ void inverseBwtFromFileInMemory(const char* fileName)
 	std::cout.write(dest, size);
 	delete [] source;
 	delete [] dest;
-}
-
-void testReversibilityWithFile(const char* fileName)
-{
-	std::ifstream file(fileName, std::ifstream::binary);
-	file.seekg(0, std::ifstream::end);
-	size_t size = file.tellg();
-//	std::cerr << size;
-	file.seekg(0, std::ifstream::beg);
-	char* source = new (std::nothrow) char[size+1](); //+1 for trailing \0
-	file.read(source, size);
-	file.close();
-	std::cerr << "Testing reversibility of file \"" << fileName << "\", size " << size << "+1\n";
-	if (isReversible(source, size+1))
-	{
-		std::cerr << "file \"" << fileName << "\" reversible\n";
-	}
-	else
-	{
-		std::cerr << "file \"" << fileName << "\" NOT reversible\n";
-	}
-	delete [] source;
 }
 
 int main(int argc, char** argv)
