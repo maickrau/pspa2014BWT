@@ -282,16 +282,8 @@ void doTests()
 	testReversibilityWithLotsOfRandoms(10, 5000);
 	testReversibilityWithLotsOfRandoms(1, 100000);
 
-//	testReversibilityWithLotsOfRandoms(60, 10000);
-/*	testReversibilityWithLotsOfRandoms(6, 100000);
-	testReversibilityWithLotsOfRandoms(1, 250000);
-	testReversibilityWithLotsOfRandoms(1, 250000);
-	testReversibilityWithLotsOfRandoms(1, 275000);
-	testReversibilityWithLotsOfRandoms(1, 300000);
-	testReversibilityWithLotsOfRandoms(1, 400000);
-	testReversibilityWithLotsOfRandoms(1, 500000);
-	testReversibilityWithLotsOfRandoms(1, 1000000);
-	testReversibilityWithLotsOfRandoms(1, 5000000);*/
+	testReversibilityWithFile("minigenome");
+	testReversibilityWithFile("genome3");
 }
 
 void bwtFromFileInMemory(const char* fileName)
@@ -369,8 +361,5 @@ void testReversibilityWithFile(const char* fileName)
 int main(int argc, char** argv)
 {
 	doTests();
-	testReversibilityWithFile("minigenome");
-	testReversibilityWithFile("genome3");
 //	bwtFromFileInMemory("genome3");
-//	inverseBwtFromFileInMemory("result.out");
 }
