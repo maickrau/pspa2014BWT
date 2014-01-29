@@ -7,12 +7,20 @@
 #include <cassert>
 #include <limits>
 #include <iostream>
+#include <streambuf>
 
 template <class O>
 void freeMemory(O& o)
 {
 	O().swap(o);
 }
+
+template <class Alphabet>
+class MemoryStreambuffer : public std::streambuf
+{
+public:
+	MemoryStreambuffer(Alphabet* memory, size_t size) : std::streambuf() { this->setg((char*)memory, (char*)memory, (char*)(memory+size)); };
+};
 
 template <class Alphabet>
 std::vector<size_t> charSums(const Alphabet* text, size_t textLen, size_t maxAlphabet)
@@ -40,7 +48,7 @@ std::tuple<std::vector<size_t>, //A_LMS,left
            ,std::vector<bool> //is S-type
 #endif
            > 
-preprocess(const Alphabet* text, size_t textLen, size_t maxAlphabet)
+preprocess(std::istream& text, size_t textLen, size_t maxAlphabet)
 {
 	std::tuple<std::vector<size_t>, 
 	           std::vector<size_t>, 
@@ -60,20 +68,25 @@ preprocess(const Alphabet* text, size_t textLen, size_t maxAlphabet)
 	size_t lastPossibleLMS = 0;
 	size_t lastCharacterBoundary = 0;
 	bool lastWasLType = false;
+	Alphabet currentSymbol;
+	Alphabet nextSymbol;
+	text.read((char*)&nextSymbol, sizeof(Alphabet));
 	for (size_t i = 0; i < textLen-1; i++)
 	{
-		assert(text[i] <= maxAlphabet);
-		sums[text[i]]++;
-		if (text[i] > text[i+1])
+		currentSymbol = nextSymbol;
+		text.read((char*)&nextSymbol, sizeof(Alphabet));
+		assert(currentSymbol <= maxAlphabet);
+		sums[currentSymbol]++;
+		if (currentSymbol > nextSymbol)
 		{
 			//L-type, and all in [lastCharacterBoundary, i] are L-type of the same letter
 			assert(i >= lastCharacterBoundary);
-			std::get<2>(ret)[text[i]] += (i-lastCharacterBoundary)+1;
+			std::get<2>(ret)[currentSymbol] += (i-lastCharacterBoundary)+1;
 			lastPossibleLMS = i+1;
 			lastCharacterBoundary = i+1;
 			lastWasLType = true;
 		}
-		else if (text[i] < text[i+1])
+		else if (currentSymbol < nextSymbol)
 		{
 			//S-type, and all in [lastCharacterBoundary, i] are S-type of the same letter
 #ifndef NDEBUG
@@ -84,7 +97,7 @@ preprocess(const Alphabet* text, size_t textLen, size_t maxAlphabet)
 #endif
 			if (lastWasLType)
 			{
-				buckets[text[i]].push_back(lastPossibleLMS);
+				buckets[currentSymbol].push_back(lastPossibleLMS);
 				if (std::get<3>(ret).size() > 0)
 				{
 					assert(std::get<3>(ret).back() != lastPossibleLMS);
@@ -96,7 +109,7 @@ preprocess(const Alphabet* text, size_t textLen, size_t maxAlphabet)
 		}
 		else
 		{
-			assert(text[i] == text[i+1]);
+			assert(currentSymbol == nextSymbol);
 		}
 	}
 	for (size_t i = 0; i < maxAlphabet+1; i++)
@@ -106,8 +119,8 @@ preprocess(const Alphabet* text, size_t textLen, size_t maxAlphabet)
 #ifndef NDEBUG
 	std::get<4>(ret)[textLen-1] = true;
 #endif
-	sums[text[textLen-1]]++;
-	buckets[text[textLen-1]].push_back(textLen-1);
+	sums[nextSymbol]++;
+	buckets[nextSymbol].push_back(textLen-1);
 	std::get<3>(ret).push_back(textLen-1);
 
 	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
@@ -494,7 +507,9 @@ void verifyLMSSuffixesAreSorted(const Alphabet* source, size_t sourceLen, const 
 template <class Alphabet>
 void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet* dest)
 {
-	auto prep = preprocess(source, sourceLen, maxAlphabet);
+	MemoryStreambuffer<Alphabet> sourceBuf((Alphabet*)source, sourceLen);
+	std::istream memoryReader(&sourceBuf);
+	auto prep = preprocess<Alphabet>(memoryReader, sourceLen, maxAlphabet);
 	auto second = step2or7(source, sourceLen, maxAlphabet, std::get<0>(prep), (Alphabet*)nullptr, std::get<1>(prep), std::get<2>(prep));
 	freeMemory(std::get<0>(prep));
 	auto third = step3or8(source, sourceLen, maxAlphabet, second, (Alphabet*)nullptr, std::get<1>(prep), std::get<2>(prep));
