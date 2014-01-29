@@ -57,49 +57,59 @@ preprocess(const Alphabet* text, size_t textLen, size_t maxAlphabet)
 #endif
 	std::vector<size_t> sums(maxAlphabet+1, 0);
 	std::vector<std::vector<size_t>> buckets(maxAlphabet+1);
-	bool isSType = true; //last character is always s-type
-	bool equalIsSType = false; //if text[i] == text[i-1], is text[i-1] s-type?
-	//i > 0 because 0 can never be LMS-type
-	for (size_t i = textLen-1; i > 0; i--)
+	size_t lastPossibleLMS = 0;
+	size_t lastCharacterBoundary = 0;
+	bool lastWasLType = false;
+	for (size_t i = 0; i < textLen-1; i++)
 	{
 		assert(text[i] <= maxAlphabet);
 		sums[text[i]]++;
+		if (text[i] > text[i+1])
+		{
+			//L-type, and all in [lastCharacterBoundary, i] are L-type of the same letter
+			assert(i >= lastCharacterBoundary);
+			std::get<2>(ret)[text[i]] += (i-lastCharacterBoundary)+1;
+			lastPossibleLMS = i+1;
+			lastCharacterBoundary = i+1;
+			lastWasLType = true;
+		}
+		else if (text[i] < text[i+1])
+		{
+			//S-type, and all in [lastCharacterBoundary, i] are S-type of the same letter
 #ifndef NDEBUG
-		std::get<4>(ret)[i] = isSType;
+			for (size_t a = lastCharacterBoundary; a <= i; a++)
+			{
+				std::get<4>(ret)[a] = true;
+			}
 #endif
-		if (!isSType)
-		{
-			std::get<2>(ret)[text[i]]++;
-		}
-		bool nextIsSType;
-		if (text[i-1] < text[i])
-		{
-			nextIsSType = true;
-		}
-		else if (text[i-1] > text[i])
-		{
-			nextIsSType = false;
+			if (lastWasLType)
+			{
+				buckets[text[i]].push_back(lastPossibleLMS);
+				if (std::get<3>(ret).size() > 0)
+				{
+					assert(std::get<3>(ret).back() != lastPossibleLMS);
+				}
+				std::get<3>(ret).push_back(lastPossibleLMS);
+			}
+			lastWasLType = false;
+			lastCharacterBoundary = i+1;
 		}
 		else
 		{
-			nextIsSType = equalIsSType;
+			assert(text[i] == text[i+1]);
 		}
-		if (isSType && !nextIsSType)
-		{
-			buckets[text[i]].push_back(i);
-			std::get<3>(ret).push_back(i);
-		}
-		if (text[i-1] != text[i])
-		{
-			equalIsSType = text[i-1] < text[i];
-		}
-		isSType = nextIsSType;
-#ifndef NDEBUG
-		std::get<4>(ret)[i-1] = isSType;
-#endif
 	}
-	sums[text[0]]++;
-	//indices were inserted in reverse order, reverse the vector to get them in right order
+	for (size_t i = 0; i < maxAlphabet+1; i++)
+	{
+		assert(std::get<2>(ret)[i] <= sums[i]);
+	}
+#ifndef NDEBUG
+	std::get<4>(ret)[textLen-1] = true;
+#endif
+	sums[text[textLen-1]]++;
+	buckets[text[textLen-1]].push_back(textLen-1);
+	std::get<3>(ret).push_back(textLen-1);
+
 	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
 	for (int i = 0; i < maxAlphabet+1; i++)
 	{
@@ -107,7 +117,6 @@ preprocess(const Alphabet* text, size_t textLen, size_t maxAlphabet)
 		{
 			std::get<1>(ret)[i] = std::get<1>(ret)[i-1]+sums[i-1];
 		}
-		std::reverse(buckets[i].begin(), buckets[i].end());
 		std::get<0>(ret).insert(std::get<0>(ret).end(), buckets[i].begin(), buckets[i].end());
 		freeMemory(buckets[i]);
 	}
@@ -434,7 +443,7 @@ std::vector<size_t> alternateStep6b(const Alphabet* text, size_t textLen, size_t
 	std::vector<size_t> ret(SAinverse.size(), 0);
 	for (size_t i = 0; i < SAinverse.size(); i++)
 	{
-		ret[SAinverse[i]] = LMSIndices[SAinverse.size()-i-1];
+		ret[SAinverse[i]] = LMSIndices[i];
 	}
 	return ret;
 }
