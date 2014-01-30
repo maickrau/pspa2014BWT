@@ -19,7 +19,7 @@ template <class Alphabet>
 class MemoryStreambuffer : public std::streambuf
 {
 public:
-	MemoryStreambuffer(Alphabet* memory, size_t size) : std::streambuf() { this->setg((char*)memory, (char*)memory, (char*)(memory+size)); };
+	MemoryStreambuffer(Alphabet* memory, size_t size) : std::streambuf() { this->setg((char*)memory, (char*)memory, (char*)(memory+size)); this->setp((char*)memory, (char*)(memory+size)); };
 };
 
 template <class Alphabet>
@@ -39,29 +39,26 @@ std::vector<size_t> charSums(const Alphabet* text, size_t textLen, size_t maxAlp
 	return ret;
 }
 
+//returns random access written results in the tuple, and sequential access written results with streams
 template <class Alphabet>
-std::tuple<std::vector<size_t>, //A_LMS,left
-           std::vector<size_t>, //charsums
-           std::vector<size_t>, //L-counts
-           std::vector<size_t>  //LMS indices in order they appear in text
+std::tuple<std::vector<size_t>, //L-counts
+           size_t               //count of LMS-type indices
 #ifndef NDEBUG
            ,std::vector<bool> //is S-type
 #endif
            > 
-preprocess(std::istream& text, size_t textLen, size_t maxAlphabet)
+preprocess(std::istream& text, size_t textLen, size_t maxAlphabet, std::ostream& LMSLeftOut, std::ostream& charSumOut, std::ostream& LMSIndicesOut)
 {
 	std::tuple<std::vector<size_t>, 
-	           std::vector<size_t>, 
-	           std::vector<size_t>, 
-	           std::vector<size_t> 
+	           size_t
 #ifndef NDEBUG
 	           ,std::vector<bool>
 #endif
 	           > ret;
-	std::get<1>(ret).resize(maxAlphabet+2, 0);
-	std::get<2>(ret).resize(maxAlphabet+1, 0);
+	std::get<0>(ret).resize(maxAlphabet+1, 0);
+	std::get<1>(ret) = 0;
 #ifndef NDEBUG
-	std::get<4>(ret).resize(textLen, false);
+	std::get<2>(ret).resize(textLen, false);
 #endif
 	std::vector<size_t> sums(maxAlphabet+1, 0);
 	std::vector<std::vector<size_t>> buckets(maxAlphabet+1);
@@ -81,7 +78,7 @@ preprocess(std::istream& text, size_t textLen, size_t maxAlphabet)
 		{
 			//L-type, and all in [lastCharacterBoundary, i] are L-type of the same letter
 			assert(i >= lastCharacterBoundary);
-			std::get<2>(ret)[currentSymbol] += (i-lastCharacterBoundary)+1;
+			std::get<0>(ret)[currentSymbol] += (i-lastCharacterBoundary)+1;
 			lastPossibleLMS = i+1;
 			lastCharacterBoundary = i+1;
 			lastWasLType = true;
@@ -92,17 +89,15 @@ preprocess(std::istream& text, size_t textLen, size_t maxAlphabet)
 #ifndef NDEBUG
 			for (size_t a = lastCharacterBoundary; a <= i; a++)
 			{
-				std::get<4>(ret)[a] = true;
+				std::get<2>(ret)[a] = true;
 			}
 #endif
 			if (lastWasLType)
 			{
 				buckets[currentSymbol].push_back(lastPossibleLMS);
-				if (std::get<3>(ret).size() > 0)
-				{
-					assert(std::get<3>(ret).back() != lastPossibleLMS);
-				}
-				std::get<3>(ret).push_back(lastPossibleLMS);
+				LMSIndicesOut.write((char*)&lastPossibleLMS, sizeof(size_t));
+				assert(std::get<1>(ret) < textLen/2);
+				std::get<1>(ret)++;
 			}
 			lastWasLType = false;
 			lastCharacterBoundary = i+1;
@@ -114,26 +109,28 @@ preprocess(std::istream& text, size_t textLen, size_t maxAlphabet)
 	}
 	for (size_t i = 0; i < maxAlphabet+1; i++)
 	{
-		assert(std::get<2>(ret)[i] <= sums[i]);
+		assert(std::get<0>(ret)[i] <= sums[i]);
 	}
 #ifndef NDEBUG
-	std::get<4>(ret)[textLen-1] = true;
+	std::get<2>(ret)[textLen-1] = true;
 #endif
 	sums[nextSymbol]++;
 	buckets[nextSymbol].push_back(textLen-1);
-	std::get<3>(ret).push_back(textLen-1);
+	size_t lastIndex = textLen-1;
+	LMSIndicesOut.write((char*)&lastIndex, sizeof(size_t));
+	assert(std::get<1>(ret) < textLen/2);
+	std::get<1>(ret)++;
 
 	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
+	size_t charSumSum = 0;
+	charSumOut.write((char*)&charSumSum, sizeof(size_t));
 	for (int i = 0; i < maxAlphabet+1; i++)
 	{
-		if (i > 0)
-		{
-			std::get<1>(ret)[i] = std::get<1>(ret)[i-1]+sums[i-1];
-		}
-		std::get<0>(ret).insert(std::get<0>(ret).end(), buckets[i].begin(), buckets[i].end());
+		charSumSum = charSumSum+sums[i];
+		charSumOut.write((char*)&charSumSum, sizeof(size_t));
+		LMSLeftOut.write((char*)buckets[i].data(), buckets[i].size()*sizeof(size_t));
 		freeMemory(buckets[i]);
 	}
-	std::get<1>(ret)[maxAlphabet+1] = std::get<1>(ret)[maxAlphabet]+sums[maxAlphabet];
 	return ret;
 }
 
@@ -509,30 +506,51 @@ void verifyLMSSuffixesAreSorted(const Alphabet* source, size_t sourceLen, const 
 template <class Alphabet>
 void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet* dest)
 {
+	std::vector<size_t> LMSLeft(sourceLen/2, 0);
+	std::vector<size_t> charSum(maxAlphabet+2, 0);
+	std::vector<size_t> LMSIndices(sourceLen/2, 0);
+
 	MemoryStreambuffer<Alphabet> sourceBuf((Alphabet*)source, sourceLen);
-	std::istream memoryReader(&sourceBuf);
-	auto prep = preprocess<Alphabet>(memoryReader, sourceLen, maxAlphabet);
-	auto second = step2or7(source, sourceLen, maxAlphabet, std::get<0>(prep), (Alphabet*)nullptr, std::get<1>(prep), std::get<2>(prep));
-	freeMemory(std::get<0>(prep));
-	auto third = step3or8(source, sourceLen, maxAlphabet, second, (Alphabet*)nullptr, std::get<1>(prep), std::get<2>(prep));
+	MemoryStreambuffer<size_t> LMSLeftBuf(LMSLeft.data(), sourceLen/2);
+	MemoryStreambuffer<size_t> charSumBuf(charSum.data(), maxAlphabet+2);
+	MemoryStreambuffer<size_t> LMSIndicesBuf(LMSIndices.data(), sourceLen/2);
+
+	std::istream sourceReader(&sourceBuf);
+//	std::istream LMSLeftReader(&LMSLeftBuf);
+//	std::istream charSumReader(&charSumBuf);
+//	std::istream LMSIndicesReader(&LMSIndicesBuf);
+
+	std::ostream LMSLeftWriter(&LMSLeftBuf);
+	std::ostream charSumWriter(&charSumBuf);
+	std::ostream LMSIndicesWriter(&LMSIndicesBuf);
+
+	auto prep = preprocess<Alphabet>(sourceReader, sourceLen, maxAlphabet, LMSLeftWriter, charSumWriter, LMSIndicesWriter);
+
+	assert(std::get<1>(prep) <= sourceLen/2);
+	LMSLeft.resize(std::get<1>(prep));
+	LMSIndices.resize(std::get<1>(prep));
+
+	auto second = step2or7(source, sourceLen, maxAlphabet, LMSLeft, (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	freeMemory(LMSLeft);
+	auto third = step3or8(source, sourceLen, maxAlphabet, second, (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	freeMemory(second);
 #ifndef NDEBUG
-	verifyLMSSubstringsAreSorted(source, sourceLen, third, std::get<4>(prep));
+	verifyLMSSubstringsAreSorted(source, sourceLen, third, std::get<2>(prep));
 #endif
 	auto fourth = step4(source, sourceLen, maxAlphabet, third);
 	freeMemory(third);
 	auto fifth = step5(fourth);
 	auto SAinverse = alternateStep6a(fifth);
 	freeMemory(fifth);
-	auto sixth = alternateStep6b(source, sourceLen, maxAlphabet, SAinverse, std::get<3>(prep));
-	freeMemory(std::get<3>(prep));
+	auto sixth = alternateStep6b(source, sourceLen, maxAlphabet, SAinverse, LMSIndices);
+	freeMemory(LMSIndices);
 	freeMemory(SAinverse);
 #ifndef NDEBUG
 	verifyLMSSuffixesAreSorted(source, sourceLen, sixth);
 #endif
-	auto seventh = step2or7(source, sourceLen, maxAlphabet, sixth, dest, std::get<1>(prep), std::get<2>(prep));
+	auto seventh = step2or7(source, sourceLen, maxAlphabet, sixth, dest, charSum, std::get<0>(prep));
 	freeMemory(sixth);
-	step3or8(source, sourceLen, maxAlphabet, seventh, dest, std::get<1>(prep), std::get<2>(prep));
+	step3or8(source, sourceLen, maxAlphabet, seventh, dest, charSum, std::get<0>(prep));
 }
 
 extern void bwt(const char* source, size_t sourceLen, char* dest);
