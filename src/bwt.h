@@ -295,7 +295,6 @@ std::vector<size_t> step3or8(const Alphabet* text, size_t textLen, size_t maxAlp
 			}
 		}	
 	}
-	std::reverse(ret.begin(), ret.end());
 	return ret;
 }
 
@@ -422,21 +421,24 @@ std::vector<size_t> step4(const Alphabet* text, size_t textLen, size_t maxAlphab
 		LMSSubstringBorder[*i] = true;
 	}
 	std::vector<size_t> sparseSPrime((textLen+1)/2, 0); //not sure if needs to round up, do it just in case
-	size_t currentName = 0;
+	size_t currentName = LMSLeft.size()+1;
 	for (size_t i = 0; i < LMSLeft.size(); i++)
 	{
 		if (i == 0 || !LMSSubstringsAreEqual(text, textLen, LMSLeft[i-1], LMSLeft[i], LMSSubstringBorder))
 		{
-			currentName++;
+			currentName--;
 		}
 		assert(LMSLeft[i]/2 < (textLen+1)/2);
 		sparseSPrime[LMSLeft[i]/2] = currentName;
+		assert(currentName > 0);
 	}
 	for (auto i = sparseSPrime.begin(); i != sparseSPrime.end(); i++)
 	{
 		if (*i != 0)
 		{
-			ret.push_back(*i-1);
+			assert(*i >= currentName);
+			ret.push_back(*i-currentName);
+			assert(ret.back() < LMSLeft.size());
 		}
 	}
 	return ret;
@@ -469,9 +471,9 @@ void verifyLMSSubstringsAreSorted(const Alphabet* source, size_t sourceLen, cons
 	{
 		substringBorders[*i] = true;
 	}
-	for (size_t i = 0; i < LMSIndices.size()-1; i++)
+	for (size_t i = LMSIndices.size()-1; i > 0; i--)
 	{
-		int diff = compareLMSSubstrings(source, sourceLen, LMSIndices[i], LMSIndices[i+1], substringBorders, isSType);
+		int diff = compareLMSSubstrings(source, sourceLen, LMSIndices[i], LMSIndices[i-1], substringBorders, isSType);
 		if (diff > 0)
 		{
 			std::cerr << "substring " << i << "/" << LMSIndices.size() << " " << diff << "\n";
