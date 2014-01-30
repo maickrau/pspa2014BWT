@@ -212,7 +212,7 @@ void step2or7(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ost
 //sorts (with step 2) the LMS-type substrings
 //call with result == nullptr to do step 3, otherwise 8
 template <class Alphabet>
-std::vector<size_t> step3or8(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSRight, Alphabet* result, const std::vector<size_t>& charSum, const std::vector<size_t>& Lsum)
+std::vector<size_t> step3or8(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::istream& LMSRight, size_t LMSRightSize, Alphabet* result, const std::vector<size_t>& charSum, const std::vector<size_t>& Lsum)
 {
 	std::vector<std::vector<size_t>> bucketsL(maxAlphabet+1);
 	std::vector<std::vector<size_t>> buckets(maxAlphabet+1); //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
@@ -221,14 +221,12 @@ std::vector<size_t> step3or8(const Alphabet* text, size_t textLen, size_t maxAlp
 		buckets[i].reserve(charSum[i+1]-charSum[i]-Lsum[i]);
 	}
 	std::vector<size_t> ret; //A_lms,left in paper, built in reverse order
-	auto LMSPosition = LMSRight.rbegin(); //note reverse, LMSRight is in proper order but we're travelling it in reverse
 	assert(maxAlphabet < std::numeric_limits<int>::max());
-	while (LMSPosition != LMSRight.rend())
+	for (size_t i = 0; i < LMSRightSize; i++)
 	{
-		assert(*LMSPosition < textLen);
-		assert(text[*LMSPosition] <= maxAlphabet);
-		bucketsL[text[*LMSPosition]].push_back(*LMSPosition);
-		LMSPosition++;
+		size_t index;
+		LMSRight.read((char*)&index, sizeof(size_t));
+		bucketsL[text[index]].push_back(index);
 	}
 	for (int bucket = maxAlphabet; bucket >= 0; bucket--)
 	{
@@ -263,28 +261,34 @@ std::vector<size_t> step3or8(const Alphabet* text, size_t textLen, size_t maxAlp
 				ret.push_back(j);
 			}
 		}
-		for (size_t i = 0; i < bucketsL[bucket].size(); i++)
+		if (bucketsL[bucket].size() > 0)
 		{
-			size_t j = bucketsL[bucket][i];
-			size_t jminus1 = j-1;
-			if (j == 0)
+			for (size_t i = bucketsL[bucket].size()-1; ; i--)
 			{
-				jminus1 = textLen-1;
-			}
-			assert(j <= textLen);
-			if (text[jminus1] <= text[j])
-			{
-				assert(text[jminus1] < maxAlphabet+1);
-				assert(text[jminus1] < bucket);
-				buckets[text[jminus1]].push_back(jminus1);
-				bucketsL[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
-			}
-			else
-			{
-				assert(false);
-				ret.push_back(j);
-			}
-		}	
+				size_t j = bucketsL[bucket][i];
+				size_t jminus1 = j-1;
+				if (j == 0)
+				{
+					jminus1 = textLen-1;
+				}
+				assert(j <= textLen);
+				if (text[jminus1] <= text[j])
+				{
+					assert(text[jminus1] < maxAlphabet+1);
+					assert(text[jminus1] < bucket);
+					buckets[text[jminus1]].push_back(jminus1);
+					bucketsL[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
+				}
+				else
+				{
+					assert(false);
+				}
+				if (i == 0)
+				{
+					break;
+				}
+			}	
+		}
 	}
 	return ret;
 }
@@ -527,10 +531,11 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	std::vector<size_t> second(std::get<1>(prep), 0);
 	MemoryStreambuffer<size_t> secondBuf(second.data(), std::get<1>(prep));
 	std::ostream secondWriter(&secondBuf);
+	std::istream secondReader(&secondBuf);
 
 	step2or7(source, sourceLen, maxAlphabet, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	freeMemory(LMSLeft);
-	auto third = step3or8(source, sourceLen, maxAlphabet, second, (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	auto third = step3or8(source, sourceLen, maxAlphabet, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	freeMemory(second);
 #ifndef NDEBUG
 	verifyLMSSubstringsAreSorted(source, sourceLen, third, std::get<2>(prep));
@@ -552,10 +557,11 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	std::vector<size_t> seventh(std::get<1>(prep), 0);
 	MemoryStreambuffer<size_t> seventhBuf(seventh.data(), std::get<1>(prep));
 	std::ostream seventhWriter(&seventhBuf);
+	std::istream seventhReader(&seventhBuf);
 
 	step2or7(source, sourceLen, maxAlphabet, seventhWriter, sixthReader, sixth.size(), dest, charSum, std::get<0>(prep));
 	freeMemory(sixth);
-	step3or8(source, sourceLen, maxAlphabet, seventh, dest, charSum, std::get<0>(prep));
+	step3or8(source, sourceLen, maxAlphabet, seventhReader, std::get<1>(prep), dest, charSum, std::get<0>(prep));
 }
 
 extern void bwt(const char* source, size_t sourceLen, char* dest);
