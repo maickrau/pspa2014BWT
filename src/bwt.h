@@ -6,6 +6,7 @@
 #include <utility>
 #include <cassert>
 #include <limits>
+#include <ios>
 #include <iostream>
 #include <streambuf>
 #include <fstream>
@@ -20,7 +21,17 @@ template <class Alphabet>
 class MemoryStreambuffer : public std::streambuf
 {
 public:
-	MemoryStreambuffer(Alphabet* memory, size_t size) : std::streambuf() { this->setg((char*)memory, (char*)memory, (char*)(memory+size)); this->setp((char*)memory, (char*)(memory+size)); };
+	MemoryStreambuffer(Alphabet* memory, size_t size) : std::streambuf() 
+	{ 
+		this->setg((char*)memory, (char*)memory, (char*)(memory+size)); 
+		this->setp((char*)memory, (char*)(memory+size)); 
+	};
+protected:
+	std::streampos seekpos(std::streampos sp, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out)
+	{
+		this->setg(eback(), eback()+sp, egptr());
+		return sp;
+	}
 };
 
 template <class Alphabet>
@@ -408,26 +419,36 @@ int compareLMSSuffixes(const Alphabet* text, size_t textLen, size_t str1, size_t
 
 //returns S'
 template <class Alphabet>
-std::vector<size_t> step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSLeft)
+std::vector<size_t> step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::istream& LMSLeft, size_t LMSLeftSize)
 {
 	std::vector<size_t> ret;
 	std::vector<bool> LMSSubstringBorder(textLen, false);
-	for (auto i = LMSLeft.begin(); i != LMSLeft.end(); i++)
+	for (size_t i = 0; i < LMSLeftSize; i++)
 	{
-		assert(*i < textLen);
-		LMSSubstringBorder[*i] = true;
+		size_t index;
+		assert(LMSLeft.good());
+		LMSLeft.read((char*)&index, sizeof(size_t));
+		LMSSubstringBorder[index] = true;
 	}
+	LMSLeft.clear();
+	LMSLeft.seekg(0);
+	assert(LMSLeft.good());
 	std::vector<size_t> sparseSPrime((textLen+1)/2, 0); //not sure if needs to round up, do it just in case
-	size_t currentName = LMSLeft.size()+1;
-	for (size_t i = 0; i < LMSLeft.size(); i++)
+	size_t currentName = LMSLeftSize+1;
+	size_t oldIndex = 0;
+	size_t index = 0;
+	for (size_t i = 0; i < LMSLeftSize; i++)
 	{
-		if (i == 0 || !LMSSubstringsAreEqual(text, textLen, LMSLeft[i-1], LMSLeft[i], LMSSubstringBorder))
+		assert(LMSLeft.good());
+		LMSLeft.read((char*)&index, sizeof(size_t));
+		if (i == 0 || !LMSSubstringsAreEqual(text, textLen, oldIndex, index, LMSSubstringBorder))
 		{
 			currentName--;
 		}
-		assert(LMSLeft[i]/2 < (textLen+1)/2);
-		sparseSPrime[LMSLeft[i]/2] = currentName;
+		assert(index/2 < (textLen+1)/2);
+		sparseSPrime[index/2] = currentName;
 		assert(currentName > 0);
+		oldIndex = index;
 	}
 	for (auto i = sparseSPrime.begin(); i != sparseSPrime.end(); i++)
 	{
@@ -435,7 +456,7 @@ std::vector<size_t> step4(const Alphabet* text, size_t textLen, size_t maxAlphab
 		{
 			assert(*i >= currentName);
 			ret.push_back(*i-currentName);
-			assert(ret.back() < LMSLeft.size());
+			assert(ret.back() < LMSLeftSize);
 		}
 	}
 	return ret;
@@ -541,13 +562,14 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	std::vector<size_t> third(std::get<1>(prep), 0);
 	MemoryStreambuffer<size_t> thirdBuf(third.data(), std::get<1>(prep));
 	std::ostream thirdWriter(&thirdBuf);
+	std::istream thirdReader(&thirdBuf);
 
 	step3or8(source, sourceLen, maxAlphabet, thirdWriter, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	freeMemory(second);
 #ifndef NDEBUG
 	verifyLMSSubstringsAreSorted(source, sourceLen, third, std::get<2>(prep));
 #endif
-	auto fourth = step4(source, sourceLen, maxAlphabet, third);
+	auto fourth = step4(source, sourceLen, maxAlphabet, thirdReader, std::get<1>(prep));
 	freeMemory(third);
 	auto fifth = step5(fourth);
 	auto SAinverse = alternateStep6a(fifth);
