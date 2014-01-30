@@ -419,9 +419,8 @@ int compareLMSSuffixes(const Alphabet* text, size_t textLen, size_t str1, size_t
 
 //returns S'
 template <class Alphabet>
-std::vector<size_t> step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::istream& LMSLeft, size_t LMSLeftSize)
+void step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize)
 {
-	std::vector<size_t> ret;
 	std::vector<bool> LMSSubstringBorder(textLen, false);
 	for (size_t i = 0; i < LMSLeftSize; i++)
 	{
@@ -455,11 +454,11 @@ std::vector<size_t> step4(const Alphabet* text, size_t textLen, size_t maxAlphab
 		if (*i != 0)
 		{
 			assert(*i >= currentName);
-			ret.push_back(*i-currentName);
-			assert(ret.back() < LMSLeftSize);
+			size_t write = *i-currentName;
+			assert(write < LMSLeftSize);
+			out.write((char*)&write, sizeof(size_t));
 		}
 	}
-	return ret;
 }
 
 std::vector<size_t> step5(const std::vector<size_t>& Sprime);
@@ -569,7 +568,12 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 #ifndef NDEBUG
 	verifyLMSSubstringsAreSorted(source, sourceLen, third, std::get<2>(prep));
 #endif
-	auto fourth = step4(source, sourceLen, maxAlphabet, thirdReader, std::get<1>(prep));
+
+	std::vector<size_t> fourth(std::get<1>(prep), 0);
+	MemoryStreambuffer<size_t> fourthBuf(fourth.data(), std::get<1>(prep));
+	std::ostream fourthWriter(&fourthBuf);
+
+	step4(source, sourceLen, maxAlphabet, fourthWriter, thirdReader, std::get<1>(prep));
 	freeMemory(third);
 	auto fifth = step5(fourth);
 	auto SAinverse = alternateStep6a(fifth);
