@@ -69,26 +69,46 @@ std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector
 	return ret;
 }
 
-std::vector<size_t> alternateStep6a(const std::vector<size_t>& BWTprime)
+std::vector<size_t> alternateStep6a(std::istream& BWTprime, size_t BWTprimeSize)
 {
-	auto maxAlphabetIterator = std::max_element(BWTprime.begin(), BWTprime.end());
-	size_t maxAlphabet = *maxAlphabetIterator;
-	std::vector<size_t> charSum = charSums(BWTprime.data(), BWTprime.size(), maxAlphabet);
-	std::vector<size_t> LFinverse(BWTprime.size(), 0);
-	std::vector<size_t> usedSlots(maxAlphabet+1, 0);
-	for (size_t i = 0; i < BWTprime.size(); i++)
+	std::vector<size_t> charNum(1, 0);
+	size_t maxAlphabet = 0;
+	for (size_t i = 0; i < BWTprimeSize; i++)
 	{
-		assert(usedSlots[BWTprime[i]] < charSum[BWTprime[i]+1]-charSum[BWTprime[i]]);
-		LFinverse[charSum[BWTprime[i]]+usedSlots[BWTprime[i]]] = i;
-		usedSlots[BWTprime[i]]++;
+		size_t read;
+		BWTprime.read((char*)&read, sizeof(size_t));
+		if (read > maxAlphabet)
+		{
+			maxAlphabet = read;
+			charNum.resize(maxAlphabet+1);
+		}
+		charNum[read]++;
+	}
+	BWTprime.clear();
+	BWTprime.seekg(0);
+	std::vector<size_t> charSum(maxAlphabet+2, 0);
+	for (size_t i = 1; i < maxAlphabet+1; i++)
+	{
+		charSum[i] = charSum[i-1]+charNum[i-1];
+	}
+	charSum[maxAlphabet+1] = charSum[maxAlphabet]+charNum[maxAlphabet];
+	std::vector<size_t> LFinverse(BWTprimeSize, 0);
+	std::vector<size_t> usedSlots(maxAlphabet+1, 0);
+	for (size_t i = 0; i < BWTprimeSize; i++)
+	{
+		size_t read;
+		BWTprime.read((char*)&read, sizeof(size_t));
+		assert(usedSlots[read] < charSum[read+1]-charSum[read]);
+		LFinverse[charSum[read]+usedSlots[read]] = i;
+		usedSlots[read]++;
 	}
 	for (size_t i = 0; i <= maxAlphabet; i++)
 	{
 		assert(usedSlots[i] == charSum[i+1]-charSum[i]);
 	}
-	std::vector<size_t> SAinverse(BWTprime.size(), 0);
+	std::vector<size_t> SAinverse(BWTprimeSize, 0);
 	size_t index = 0;
-	for (size_t i = 0; i < BWTprime.size(); i++)
+	for (size_t i = 0; i < BWTprimeSize; i++)
 	{
 		SAinverse[i] = LFinverse[index];
 		index = LFinverse[index];
