@@ -137,7 +137,7 @@ preprocess(std::istream& text, size_t textLen, size_t maxAlphabet, std::ostream&
 //sorts (with step 3) the LMS-type substrings
 //call with result == nullptr to do step 2, otherwise step 7
 template <class Alphabet>
-std::vector<size_t> step2or7(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::istream& LMSLeft, size_t LMSLeftSize, Alphabet* result, const std::vector<size_t>& charSum, const std::vector<size_t>& Lsum)
+void step2or7(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize, Alphabet* result, const std::vector<size_t>& charSum, const std::vector<size_t>& Lsum)
 {
 	std::vector<std::vector<size_t>> bucketsS(maxAlphabet+1);
 	std::vector<std::vector<size_t>> buckets(maxAlphabet+1); //A_l in paper
@@ -145,7 +145,6 @@ std::vector<size_t> step2or7(const Alphabet* text, size_t textLen, size_t maxAlp
 	{
 		buckets[i].reserve(Lsum[i]);
 	}
-	std::vector<size_t> ret; //A_lms,right in paper
 	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
 	for (size_t i = 0; i < LMSLeftSize; i++)
 	{
@@ -179,7 +178,7 @@ std::vector<size_t> step2or7(const Alphabet* text, size_t textLen, size_t maxAlp
 			}
 			else
 			{
-				ret.push_back(j);
+				out.write((char*)&j, sizeof(size_t));
 			}
 		}
 		for (size_t i = 0; i < bucketsS[bucket].size(); i++)
@@ -205,11 +204,9 @@ std::vector<size_t> step2or7(const Alphabet* text, size_t textLen, size_t maxAlp
 			else
 			{
 				assert(false);
-				ret.push_back(j);
 			}
 		}
 	}
-	return ret;
 }
 
 //sorts (with step 2) the LMS-type substrings
@@ -527,7 +524,11 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	LMSLeft.resize(std::get<1>(prep));
 	LMSIndices.resize(std::get<1>(prep));
 
-	auto second = step2or7(source, sourceLen, maxAlphabet, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	std::vector<size_t> second(std::get<1>(prep), 0);
+	MemoryStreambuffer<size_t> secondBuf(second.data(), std::get<1>(prep));
+	std::ostream secondWriter(&secondBuf);
+
+	step2or7(source, sourceLen, maxAlphabet, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	freeMemory(LMSLeft);
 	auto third = step3or8(source, sourceLen, maxAlphabet, second, (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	freeMemory(second);
@@ -547,7 +548,12 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 #endif
 	MemoryStreambuffer<size_t> sixthBuf(sixth.data(), sixth.size());
 	std::istream sixthReader(&sixthBuf);
-	auto seventh = step2or7(source, sourceLen, maxAlphabet, sixthReader, sixth.size(), dest, charSum, std::get<0>(prep));
+
+	std::vector<size_t> seventh(std::get<1>(prep), 0);
+	MemoryStreambuffer<size_t> seventhBuf(seventh.data(), std::get<1>(prep));
+	std::ostream seventhWriter(&seventhBuf);
+
+	step2or7(source, sourceLen, maxAlphabet, seventhWriter, sixthReader, sixth.size(), dest, charSum, std::get<0>(prep));
 	freeMemory(sixth);
 	step3or8(source, sourceLen, maxAlphabet, seventh, dest, charSum, std::get<0>(prep));
 }
