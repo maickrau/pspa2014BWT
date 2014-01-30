@@ -137,7 +137,7 @@ preprocess(std::istream& text, size_t textLen, size_t maxAlphabet, std::ostream&
 //sorts (with step 3) the LMS-type substrings
 //call with result == nullptr to do step 2, otherwise step 7
 template <class Alphabet>
-std::vector<size_t> step2or7(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& LMSLeft, Alphabet* result, const std::vector<size_t>& charSum, const std::vector<size_t>& Lsum)
+std::vector<size_t> step2or7(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::istream& LMSLeft, size_t LMSLeftSize, Alphabet* result, const std::vector<size_t>& charSum, const std::vector<size_t>& Lsum)
 {
 	std::vector<std::vector<size_t>> bucketsS(maxAlphabet+1);
 	std::vector<std::vector<size_t>> buckets(maxAlphabet+1); //A_l in paper
@@ -146,15 +146,12 @@ std::vector<size_t> step2or7(const Alphabet* text, size_t textLen, size_t maxAlp
 		buckets[i].reserve(Lsum[i]);
 	}
 	std::vector<size_t> ret; //A_lms,right in paper
-	auto LMSPosition = LMSLeft.begin(); //LMSLeft is A_lms,left in paper
-	assert(LMSPosition != LMSLeft.end());
 	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
-	while (LMSPosition != LMSLeft.end())
+	for (size_t i = 0; i < LMSLeftSize; i++)
 	{
-		assert(*LMSPosition < textLen);
-		assert(text[*LMSPosition] <= maxAlphabet);
-		bucketsS[text[*LMSPosition]].push_back(*LMSPosition);
-		LMSPosition++;
+		size_t index;
+		LMSLeft.read((char*)&index, sizeof(size_t));
+		bucketsS[text[index]].push_back(index);
 	}
 	for (int bucket = 0; bucket < maxAlphabet+1; bucket++)
 	{
@@ -516,7 +513,7 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	MemoryStreambuffer<size_t> LMSIndicesBuf(LMSIndices.data(), sourceLen/2);
 
 	std::istream sourceReader(&sourceBuf);
-//	std::istream LMSLeftReader(&LMSLeftBuf);
+	std::istream LMSLeftReader(&LMSLeftBuf);
 //	std::istream charSumReader(&charSumBuf);
 //	std::istream LMSIndicesReader(&LMSIndicesBuf);
 
@@ -530,7 +527,7 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	LMSLeft.resize(std::get<1>(prep));
 	LMSIndices.resize(std::get<1>(prep));
 
-	auto second = step2or7(source, sourceLen, maxAlphabet, LMSLeft, (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	auto second = step2or7(source, sourceLen, maxAlphabet, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	freeMemory(LMSLeft);
 	auto third = step3or8(source, sourceLen, maxAlphabet, second, (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	freeMemory(second);
@@ -548,7 +545,9 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 #ifndef NDEBUG
 	verifyLMSSuffixesAreSorted(source, sourceLen, sixth);
 #endif
-	auto seventh = step2or7(source, sourceLen, maxAlphabet, sixth, dest, charSum, std::get<0>(prep));
+	MemoryStreambuffer<size_t> sixthBuf(sixth.data(), sixth.size());
+	std::istream sixthReader(&sixthBuf);
+	auto seventh = step2or7(source, sourceLen, maxAlphabet, sixthReader, sixth.size(), dest, charSum, std::get<0>(prep));
 	freeMemory(sixth);
 	step3or8(source, sourceLen, maxAlphabet, seventh, dest, charSum, std::get<0>(prep));
 }
