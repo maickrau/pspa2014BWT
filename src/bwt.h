@@ -468,14 +468,17 @@ std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector
 void alternateStep6a(std::ostream& SAinverse, std::istream& BWTprime, size_t BWTprimeSize);
 
 template <class Alphabet>
-std::vector<size_t> alternateStep6b(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& SAinverse, const std::vector<size_t>& LMSIndices)
+std::vector<size_t> alternateStep6b(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::istream& SAinverse, std::istream& LMSIndices, size_t size)
 {
 	assert(textLen > 0);
-	assert(SAinverse.size() == LMSIndices.size());
-	std::vector<size_t> ret(SAinverse.size(), 0);
-	for (size_t i = 0; i < SAinverse.size(); i++)
+	std::vector<size_t> ret(size, 0);
+	for (size_t i = 0; i < size; i++)
 	{
-		ret[SAinverse[i]] = LMSIndices[i];
+		size_t SA;
+		SAinverse.read((char*)&SA, sizeof(size_t));
+		size_t index;
+		LMSIndices.read((char*)&index, sizeof(size_t));
+		ret[SA] = index;
 	}
 	return ret;
 }
@@ -538,7 +541,7 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	std::istream sourceReader(&sourceBuf);
 	std::istream LMSLeftReader(&LMSLeftBuf);
 //	std::istream charSumReader(&charSumBuf);
-//	std::istream LMSIndicesReader(&LMSIndicesBuf);
+	std::istream LMSIndicesReader(&LMSIndicesBuf);
 
 	std::ostream LMSLeftWriter(&LMSLeftBuf);
 	std::ostream charSumWriter(&charSumBuf);
@@ -582,10 +585,11 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	std::vector<size_t> SAinverse(std::get<1>(prep), 0);
 	MemoryStreambuffer<size_t> SAinverseBuf(SAinverse.data(), std::get<1>(prep));
 	std::ostream SAinverseWriter(&SAinverseBuf);
+	std::istream SAinverseReader(&SAinverseBuf);
 
 	alternateStep6a(SAinverseWriter, fifthReader, std::get<1>(prep));
 	freeMemory(fifth);
-	auto sixth = alternateStep6b(source, sourceLen, maxAlphabet, SAinverse, LMSIndices);
+	auto sixth = alternateStep6b(source, sourceLen, maxAlphabet, SAinverseReader, LMSIndicesReader, std::get<1>(prep));
 	freeMemory(LMSIndices);
 	freeMemory(SAinverse);
 #ifndef NDEBUG
