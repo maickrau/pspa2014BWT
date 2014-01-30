@@ -47,20 +47,14 @@ std::vector<size_t> step5(const std::vector<size_t>& Sprime)
 		}
 		isUnique[*i] = false;
 	}
+	freeMemory(isUnique);
 	if (canCalculateDirectly)
 	{
 		return bwtDirectly(Sprime);
 	}
-//	assert(false); //modification to the algorithm, all names are unique so can always calculate directly
-	size_t* rawResult = new size_t[Sprime.size()]();
+	std::vector<size_t> result(Sprime.size(), 0);
 	auto max = std::max_element(Sprime.begin(), Sprime.end());
-	bwt(Sprime.data(), Sprime.size(), *max, rawResult);
-	std::vector<size_t> result;
-	for (size_t i = 0; i < Sprime.size(); i++)
-	{
-		result.push_back(rawResult[i]);
-	}
-	delete [] rawResult;
+	bwt(Sprime.data(), Sprime.size(), *max, result.data());
 	return result;
 }
 
