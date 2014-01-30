@@ -465,7 +465,7 @@ std::vector<size_t> step5(const std::vector<size_t>& Sprime);
 
 std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector<size_t>& R);
 
-std::vector<size_t> alternateStep6a(std::istream& BWTprime, size_t BWTprimeSize);
+void alternateStep6a(std::ostream& SAinverse, std::istream& BWTprime, size_t BWTprimeSize);
 
 template <class Alphabet>
 std::vector<size_t> alternateStep6b(const Alphabet* text, size_t textLen, size_t maxAlphabet, const std::vector<size_t>& SAinverse, const std::vector<size_t>& LMSIndices)
@@ -579,8 +579,11 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 
 	MemoryStreambuffer<size_t> fifthBuf(fifth.data(), std::get<1>(prep));
 	std::istream fifthReader(&fifthBuf);
+	std::vector<size_t> SAinverse(std::get<1>(prep), 0);
+	MemoryStreambuffer<size_t> SAinverseBuf(SAinverse.data(), std::get<1>(prep));
+	std::ostream SAinverseWriter(&SAinverseBuf);
 
-	auto SAinverse = alternateStep6a(fifthReader, std::get<1>(prep));
+	alternateStep6a(SAinverseWriter, fifthReader, std::get<1>(prep));
 	freeMemory(fifth);
 	auto sixth = alternateStep6b(source, sourceLen, maxAlphabet, SAinverse, LMSIndices);
 	freeMemory(LMSIndices);

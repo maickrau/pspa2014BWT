@@ -69,7 +69,7 @@ std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector
 	return ret;
 }
 
-std::vector<size_t> alternateStep6a(std::istream& BWTprime, size_t BWTprimeSize)
+void alternateStep6a(std::ostream& SAinverse, std::istream& BWTprime, size_t BWTprimeSize)
 {
 	std::vector<size_t> charNum(1, 0);
 	size_t maxAlphabet = 0;
@@ -106,14 +106,12 @@ std::vector<size_t> alternateStep6a(std::istream& BWTprime, size_t BWTprimeSize)
 	{
 		assert(usedSlots[i] == charSum[i+1]-charSum[i]);
 	}
-	std::vector<size_t> SAinverse(BWTprimeSize, 0);
 	size_t index = 0;
 	for (size_t i = 0; i < BWTprimeSize; i++)
 	{
-		SAinverse[i] = LFinverse[index];
+		SAinverse.write((char*)&LFinverse[index], sizeof(size_t));
 		index = LFinverse[index];
 	}
-	return SAinverse;
 }
 
 void inverseBWT(const char* source, size_t sourceLen, char* dest)
