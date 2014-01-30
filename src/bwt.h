@@ -8,6 +8,7 @@
 #include <limits>
 #include <iostream>
 #include <streambuf>
+#include <fstream>
 
 template <class O>
 void freeMemory(O& o)
@@ -212,7 +213,7 @@ void step2or7(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ost
 //sorts (with step 2) the LMS-type substrings
 //call with result == nullptr to do step 3, otherwise 8
 template <class Alphabet>
-std::vector<size_t> step3or8(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::istream& LMSRight, size_t LMSRightSize, Alphabet* result, const std::vector<size_t>& charSum, const std::vector<size_t>& Lsum)
+void step3or8(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSRight, size_t LMSRightSize, Alphabet* result, const std::vector<size_t>& charSum, const std::vector<size_t>& Lsum)
 {
 	std::vector<std::vector<size_t>> bucketsL(maxAlphabet+1);
 	std::vector<std::vector<size_t>> buckets(maxAlphabet+1); //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
@@ -220,7 +221,6 @@ std::vector<size_t> step3or8(const Alphabet* text, size_t textLen, size_t maxAlp
 	{
 		buckets[i].reserve(charSum[i+1]-charSum[i]-Lsum[i]);
 	}
-	std::vector<size_t> ret; //A_lms,left in paper, built in reverse order
 	assert(maxAlphabet < std::numeric_limits<int>::max());
 	for (size_t i = 0; i < LMSRightSize; i++)
 	{
@@ -258,7 +258,10 @@ std::vector<size_t> step3or8(const Alphabet* text, size_t textLen, size_t maxAlp
 			else
 			{
 				assert(j != 0);
-				ret.push_back(j);
+				if (result == nullptr) //don't return anything for step 8
+				{
+					out.write((char*)&j, sizeof(size_t));
+				}
 			}
 		}
 		if (bucketsL[bucket].size() > 0)
@@ -290,7 +293,6 @@ std::vector<size_t> step3or8(const Alphabet* text, size_t textLen, size_t maxAlp
 			}	
 		}
 	}
-	return ret;
 }
 
 template <class Alphabet>
@@ -535,7 +537,12 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 
 	step2or7(source, sourceLen, maxAlphabet, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	freeMemory(LMSLeft);
-	auto third = step3or8(source, sourceLen, maxAlphabet, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+
+	std::vector<size_t> third(std::get<1>(prep), 0);
+	MemoryStreambuffer<size_t> thirdBuf(third.data(), std::get<1>(prep));
+	std::ostream thirdWriter(&thirdBuf);
+
+	step3or8(source, sourceLen, maxAlphabet, thirdWriter, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	freeMemory(second);
 #ifndef NDEBUG
 	verifyLMSSubstringsAreSorted(source, sourceLen, third, std::get<2>(prep));
@@ -561,7 +568,8 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 
 	step2or7(source, sourceLen, maxAlphabet, seventhWriter, sixthReader, sixth.size(), dest, charSum, std::get<0>(prep));
 	freeMemory(sixth);
-	step3or8(source, sourceLen, maxAlphabet, seventhReader, std::get<1>(prep), dest, charSum, std::get<0>(prep));
+	std::ofstream dummyStream;
+	step3or8(source, sourceLen, maxAlphabet, dummyStream, seventhReader, std::get<1>(prep), dest, charSum, std::get<0>(prep));
 }
 
 extern void bwt(const char* source, size_t sourceLen, char* dest);
