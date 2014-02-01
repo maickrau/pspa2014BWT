@@ -267,7 +267,7 @@ void testReversibilityWithFile(const char* fileName)
 	char* source = new (std::nothrow) char[size+1](); //+1 for trailing \0
 	file.read(source, size);
 	file.close();
-	std::cerr << "Testing reversibility of file \"" << fileName << "\", size " << size << "+1\n";
+	std::cerr << "Testing in-memory BWT reversibility with data from file \"" << fileName << "\", size " << size << "+1\n";
 	if (isReversible(source, size+1))
 	{
 		std::cerr << "file \"" << fileName << "\" reversible\n";
@@ -306,6 +306,36 @@ void doTests()
 
 	testReversibilityWithFile("minigenome");
 	testReversibilityWithFile("genome3");
+}
+
+void testInFileBWT(const std::string& fileName)
+{
+	std::cerr << "Testing in-file BWT against in-memory BWT with file \"" << fileName << "\"\n";
+	std::vector<unsigned char> raw = readVectorFromFile<unsigned char>(fileName, true);
+	std::vector<unsigned char> result(raw.size(), 0);
+	bwt(raw.data(), raw.size(), 255, result.data());
+	freeMemory(raw);
+	std::string resultFile = getTempFileName();
+	bwtInFiles<unsigned char>(fileName, 255, resultFile);
+	std::vector<unsigned char> comp = readVectorFromFile<unsigned char>(resultFile, false);
+	if (comp.size() != result.size())
+	{
+		std::cerr << "BWT in file \"" << fileName << "\" NOT equal to in-memory (wrong size: " << comp.size() << " vs " << result.size() << ")\n";; 
+	}
+	if (std::equal(result.begin(), result.end(), comp.begin()))
+	{
+		std::cerr << "BWT in file \"" << fileName << "\" equal to in-memory\n"; 
+	}
+	else
+	{
+		std::cerr << "BWT in file \"" << fileName << "\" NOT equal to in-memory (wrong values)"; 
+	}
+	remove(resultFile.c_str());
+}
+
+void doInFileTests()
+{
+	testInFileBWT("minigenome");
 }
 
 void bwtFromFileInMemory(const char* fileName)
@@ -361,5 +391,6 @@ void inverseBwtFromFileInMemory(const char* fileName)
 int main(int argc, char** argv)
 {
 	doTests();
+	doInFileTests();
 //	bwtFromFileInMemory("genome3");
 }

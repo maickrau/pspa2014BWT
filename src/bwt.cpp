@@ -3,6 +3,37 @@
 
 #include "bwt.h"
 
+size_t nextTempFileName = 0;
+
+std::string getTempFileName()
+{
+	std::string tryThis;
+	bool usable;
+	do
+	{
+		usable = true;
+		tryThis = "tmp" + std::to_string(nextTempFileName) + ".tmp";
+		nextTempFileName++;
+		std::ifstream fileExists(tryThis);
+		if (fileExists)
+		{
+			usable = false;
+			fileExists.close();
+			continue;
+		}
+		std::ofstream canBeCreated(tryThis);
+		if (!canBeCreated)
+		{
+			usable = false;
+		}
+		else
+		{
+			canBeCreated.close();
+		}
+	} while (!usable);
+	return tryThis;
+}
+
 void bwt(const char* source, size_t sourceLen, char* dest)
 {
 	bwt<unsigned char>((const unsigned char*)source, sourceLen, 255, (unsigned char*)dest);
@@ -56,6 +87,38 @@ std::vector<size_t> step5(const std::vector<size_t>& Sprime)
 	auto max = std::max_element(Sprime.begin(), Sprime.end());
 	bwt(Sprime.data(), Sprime.size(), *max, result.data());
 	return result;
+}
+
+void step5InFile(const std::string& SprimeFile, const std::string& outFile, size_t SprimeSize)
+{
+	std::vector<bool> isUnique(SprimeSize, true);
+	bool canCalculateDirectly = true;
+	size_t index;
+	std::ifstream file(SprimeFile, std::ios::binary);
+	size_t max = 0;
+	for (size_t i = 0; i < SprimeSize; i++)
+	{
+		file.read((char*)&index, sizeof(size_t));
+		if (!isUnique[index])
+		{
+			canCalculateDirectly = false;
+		}
+		isUnique[index] = false;
+		if (index > max)
+		{
+			max = index;
+		}
+	}
+	file.close();
+	freeMemory(isUnique);
+	if (canCalculateDirectly)
+	{
+		std::vector<size_t> SprimeVec = readVectorFromFile<size_t>(SprimeFile, false);
+		std::vector<size_t> result = bwtDirectly(SprimeVec);
+		writeVectorToFile(result, outFile);
+		return;
+	}
+	bwtInFiles<size_t>(SprimeFile, max, outFile, false);
 }
 
 std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector<size_t>& R)

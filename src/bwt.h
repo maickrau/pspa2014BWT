@@ -11,6 +11,50 @@
 #include <streambuf>
 #include <fstream>
 
+std::string getTempFileName();
+
+template <class Type>
+std::vector<Type> readVectorFromFile(const std::string& sourceFile, bool addSentinel)
+{
+	std::ifstream file(sourceFile, std::ios::binary);
+	file.seekg(0, std::ios::end);
+	assert(file.tellg() % sizeof(Type) == 0);
+	size_t fileLen = file.tellg()/sizeof(Type);
+	file.clear();
+	file.seekg(0, std::ios::beg);
+	if (addSentinel)
+	{
+		fileLen++;
+	}
+	std::vector<Type> ret(fileLen, 0);
+	if (addSentinel)
+	{
+		fileLen--;
+	}
+	file.read((char*)ret.data(), fileLen*sizeof(Type));
+	file.close();
+	return ret;
+}
+
+template <class Type>
+void writeVectorToFile(const std::vector<Type> vec, const std::string& destFile)
+{
+	std::ofstream file(destFile, std::ios::binary);
+	file.write((char*)vec.data(), vec.size()*sizeof(Type));
+	file.close();
+}
+
+template <class Alphabet>
+size_t getFileLengthInAlphabets(const std::string& sourceFile)
+{
+	std::ifstream file(sourceFile, std::ios::binary);
+	file.seekg(0, std::ios::end);
+	assert(file.tellg() % sizeof(Alphabet) == 0);
+	size_t fileLen = file.tellg()/sizeof(Alphabet);
+	file.close();
+	return fileLen;
+}
+
 template <class O>
 void freeMemory(O& o)
 {
@@ -59,7 +103,7 @@ std::tuple<std::vector<size_t>, //L-counts
            ,std::vector<bool> //is S-type
 #endif
            > 
-preprocess(std::istream& text, size_t textLen, size_t maxAlphabet, std::ostream& LMSLeftOut, std::ostream& charSumOut, std::ostream& LMSIndicesOut)
+preprocess(std::istream& text, size_t textLen, size_t maxAlphabet, std::ostream& LMSLeftOut, std::ostream& charSumOut, std::ostream& LMSIndicesOut, bool addSentinel)
 {
 	std::tuple<std::vector<size_t>, 
 	           size_t
@@ -83,7 +127,14 @@ preprocess(std::istream& text, size_t textLen, size_t maxAlphabet, std::ostream&
 	for (size_t i = 0; i < textLen-1; i++)
 	{
 		currentSymbol = nextSymbol;
-		text.read((char*)&nextSymbol, sizeof(Alphabet));
+		if (addSentinel && i == textLen-2)
+		{
+			nextSymbol = 0;
+		}
+		else
+		{
+			text.read((char*)&nextSymbol, sizeof(Alphabet));
+		}
 		assert(currentSymbol <= maxAlphabet);
 		sums[currentSymbol]++;
 		if (currentSymbol > nextSymbol)
@@ -462,15 +513,15 @@ void step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ostrea
 }
 
 std::vector<size_t> step5(const std::vector<size_t>& Sprime);
+void step5InFile(const std::string& SprimeFile, const std::string& outFile, size_t SprimeSize);
 
 std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector<size_t>& R);
 
 void alternateStep6a(std::ostream& SAinverse, std::istream& BWTprime, size_t BWTprimeSize);
 
 template <class Alphabet>
-std::vector<size_t> alternateStep6b(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::istream& SAinverse, std::istream& LMSIndices, size_t size)
+std::vector<size_t> alternateStep6b(std::istream& SAinverse, std::istream& LMSIndices, size_t size)
 {
-	assert(textLen > 0);
 	std::vector<size_t> ret(size, 0);
 	for (size_t i = 0; i < size; i++)
 	{
@@ -547,7 +598,7 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	std::ostream charSumWriter(&charSumBuf);
 	std::ostream LMSIndicesWriter(&LMSIndicesBuf);
 
-	auto prep = preprocess<Alphabet>(sourceReader, sourceLen, maxAlphabet, LMSLeftWriter, charSumWriter, LMSIndicesWriter);
+	auto prep = preprocess<Alphabet>(sourceReader, sourceLen, maxAlphabet, LMSLeftWriter, charSumWriter, LMSIndicesWriter, false);
 
 	assert(std::get<1>(prep) <= sourceLen/2);
 	LMSLeft.resize(std::get<1>(prep));
@@ -589,7 +640,7 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 
 	alternateStep6a(SAinverseWriter, fifthReader, std::get<1>(prep));
 	freeMemory(fifth);
-	auto sixth = alternateStep6b(source, sourceLen, maxAlphabet, SAinverseReader, LMSIndicesReader, std::get<1>(prep));
+	auto sixth = alternateStep6b<size_t>(SAinverseReader, LMSIndicesReader, std::get<1>(prep));
 	freeMemory(LMSIndices);
 	freeMemory(SAinverse);
 #ifndef NDEBUG
@@ -607,6 +658,137 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	freeMemory(sixth);
 	std::ofstream dummyStream;
 	step3or8(source, sourceLen, maxAlphabet, dummyStream, seventhReader, std::get<1>(prep), dest, charSum, std::get<0>(prep));
+}
+
+template <class Alphabet>
+void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, const std::string& destFile, bool addSentinel)
+{
+	size_t sourceLen = getFileLengthInAlphabets<Alphabet>(sourceFile);
+	if (addSentinel)
+	{
+		sourceLen++;
+	}
+	
+	std::string LMSLeftFile = getTempFileName();
+	std::string charSumFile = getTempFileName();
+	std::string LMSIndicesFile = getTempFileName();
+	std::string LCountFile = getTempFileName();
+	std::string secondFile = getTempFileName();
+	std::string thirdFile = getTempFileName();
+	std::string fourthFile = getTempFileName();
+	std::string fifthFile = getTempFileName();
+	std::string SAinverseFile = getTempFileName();
+	std::string sixthFile = getTempFileName();
+	std::string seventhFile = getTempFileName();
+
+	std::ofstream LMSLeftWriter(LMSLeftFile, std::ios::binary);
+	std::ofstream charSumWriter(charSumFile, std::ios::binary);
+	std::ofstream LMSIndicesWriter(LMSIndicesFile, std::ios::binary);
+	std::ifstream sourceReader(sourceFile, std::ios::binary);
+
+	auto prep = preprocess<Alphabet>(sourceReader, sourceLen, maxAlphabet, LMSLeftWriter, charSumWriter, LMSIndicesWriter, addSentinel);
+	LMSLeftWriter.close();
+	charSumWriter.close();
+	LMSIndicesWriter.close();
+	sourceReader.close();
+
+	assert(std::get<1>(prep) <= sourceLen/2);
+
+	std::vector<size_t> charSum = readVectorFromFile<size_t>(charSumFile, false);
+	std::vector<Alphabet> source;
+	source = readVectorFromFile<Alphabet>(sourceFile, addSentinel);
+
+	std::ofstream secondWriter(secondFile, std::ios::binary);
+	std::ifstream LMSLeftReader(LMSLeftFile, std::ios::binary);
+
+	step2or7(source.data(), sourceLen, maxAlphabet, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	secondWriter.close();
+	LMSLeftReader.close();
+
+	std::ofstream thirdWriter(thirdFile, std::ios::binary);
+	std::ifstream secondReader(secondFile, std::ios::binary);
+
+	step3or8(source.data(), sourceLen, maxAlphabet, thirdWriter, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	thirdWriter.close();
+	secondReader.close();
+
+#ifndef NDEBUG
+	std::vector<size_t> third = readVectorFromFile<size_t>(thirdFile, false);
+	verifyLMSSubstringsAreSorted(source.data(), sourceLen, third, std::get<2>(prep));
+	freeMemory(third);
+#endif
+
+	std::ofstream fourthWriter(fourthFile, std::ios::binary);
+	std::ifstream thirdReader(thirdFile, std::ios::binary);
+
+	step4(source.data(), sourceLen, maxAlphabet, fourthWriter, thirdReader, std::get<1>(prep));
+	fourthWriter.close();
+	thirdReader.close();
+
+	freeMemory(source);
+
+	step5InFile(fourthFile, fifthFile, std::get<1>(prep));
+
+	std::ofstream SAinverseWriter(SAinverseFile, std::ios::binary);
+	std::ifstream fifthReader(fifthFile, std::ios::binary);
+
+	alternateStep6a(SAinverseWriter, fifthReader, std::get<1>(prep));
+	SAinverseWriter.close();
+	fifthReader.close();
+
+	std::ifstream SAinverseReader(SAinverseFile, std::ios::binary);
+	std::ifstream LMSIndicesReader(LMSIndicesFile, std::ios::binary);
+
+	auto sixth = alternateStep6b<size_t>(SAinverseReader, LMSIndicesReader, std::get<1>(prep));
+	SAinverseReader.close();
+	LMSIndicesReader.close();
+
+	writeVectorToFile(sixth, sixthFile);
+#ifndef NDEBUG
+#else
+	freeMemory(sixth);
+#endif
+
+	source = readVectorFromFile<Alphabet>(sourceFile, addSentinel);
+#ifndef NDEBUG
+	verifyLMSSuffixesAreSorted(source.data(), sourceLen, sixth);
+	freeMemory(sixth);
+#endif
+
+	std::vector<Alphabet> dest(sourceLen, 0);
+
+	std::ofstream seventhWriter(seventhFile, std::ios::binary);
+	std::ifstream sixthReader(sixthFile, std::ios::binary);
+
+	step2or7(source.data(), sourceLen, maxAlphabet, seventhWriter, sixthReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
+	seventhWriter.close();
+	sixthReader.close();
+
+	std::ifstream seventhReader(seventhFile, std::ios::binary);
+
+	std::ofstream dummyStream;
+	step3or8(source.data(), sourceLen, maxAlphabet, dummyStream, seventhReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
+	seventhReader.close();
+
+	writeVectorToFile(dest, destFile);
+
+	remove(LMSLeftFile.c_str());
+	remove(charSumFile.c_str());
+	remove(LMSIndicesFile.c_str());
+	remove(LCountFile.c_str());
+	remove(secondFile.c_str());
+	remove(thirdFile.c_str());
+	remove(fourthFile.c_str());
+	remove(fifthFile.c_str());
+	remove(SAinverseFile.c_str());
+	remove(sixthFile.c_str());
+	remove(seventhFile.c_str());
+}
+
+template <class Alphabet>
+void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, const std::string& destFile)
+{
+	bwtInFiles<Alphabet>(sourceFile, maxAlphabet, destFile, true);
 }
 
 extern void bwt(const char* source, size_t sourceLen, char* dest);
