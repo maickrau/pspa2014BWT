@@ -237,7 +237,6 @@ void step2or7(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ost
 			{
 				assert(text[jminus1] < maxAlphabet+1);
 				buckets[text[jminus1]].push_back(jminus1);
-				buckets[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
 			}
 			else
 			{
@@ -262,7 +261,6 @@ void step2or7(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ost
 				assert(text[jminus1] > bucket);
 				assert(text[jminus1] < maxAlphabet+1);
 				buckets[text[jminus1]].push_back(jminus1);
-				bucketsS[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
 			}
 			else
 			{
@@ -315,7 +313,6 @@ void step3or8(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ost
 			{
 				assert(text[jminus1] < maxAlphabet+1);
 				buckets[text[jminus1]].push_back(jminus1);
-				buckets[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
 			}
 			else
 			{
@@ -342,7 +339,6 @@ void step3or8(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ost
 					assert(text[jminus1] < maxAlphabet+1);
 					assert(text[jminus1] < bucket);
 					buckets[text[jminus1]].push_back(jminus1);
-					bucketsL[bucket][i] = -1; //don't erase() because erase is O(n), just mark as unused
 				}
 				else
 				{
