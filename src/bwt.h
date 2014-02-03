@@ -199,14 +199,19 @@ preprocess(std::istream& text, size_t textLen, size_t maxAlphabet, std::ostream&
 
 //sorts (with step 3) the LMS-type substrings
 //call with result == nullptr to do step 2, otherwise step 7
-template <class Alphabet>
-void step2or7(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize, Alphabet* result, const std::vector<size_t>& charSum, const std::vector<size_t>& Lsum)
+template <class Alphabet, bool isStep7>
+void step2or7(const Alphabet* const text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize, Alphabet* const result, const std::vector<size_t>& charSum, const std::vector<size_t>& Lsum)
 {
+	if (isStep7)
+	{
+		assert(result != nullptr);
+	}
 	std::vector<std::vector<size_t>> bucketsS(maxAlphabet+1);
-	std::vector<std::vector<size_t>> buckets(maxAlphabet+1); //A_l in paper
+	std::vector<size_t*> buckets(maxAlphabet+1, nullptr); //A_l in paper
+	std::vector<size_t> bucketsSize(maxAlphabet+1, 0);
 	for (size_t i = 0; i < maxAlphabet+1; i++)
 	{
-		buckets[i].reserve(Lsum[i]);
+		buckets[i] = new size_t[Lsum[i]];
 	}
 	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
 	for (size_t i = 0; i < LMSLeftSize; i++)
@@ -218,7 +223,7 @@ void step2or7(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ost
 	for (int bucket = 0; bucket < maxAlphabet+1; bucket++)
 	{
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
-		for (size_t i = 0; i < buckets[bucket].size(); i++)
+		for (size_t i = 0; i < bucketsSize[bucket]; i++)
 		{
 			size_t j = buckets[bucket][i];
 			size_t jminus1 = j-1;
@@ -226,7 +231,7 @@ void step2or7(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ost
 			{
 				jminus1 = textLen-1;
 			}
-			if (result != nullptr)
+			if (isStep7)
 			{
 				assert(charSum[text[j]]+i < textLen);
 				assert(i < charSum[text[j]+1]-charSum[text[j]]);
@@ -236,13 +241,15 @@ void step2or7(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ost
 			if (text[jminus1] >= text[j])
 			{
 				assert(text[jminus1] < maxAlphabet+1);
-				buckets[text[jminus1]].push_back(jminus1);
+				buckets[text[jminus1]][bucketsSize[text[jminus1]]] = jminus1;
+				bucketsSize[text[jminus1]]++;
 			}
 			else
 			{
 				out.write((char*)&j, sizeof(size_t));
 			}
 		}
+		delete [] buckets[bucket];
 		for (size_t i = 0; i < bucketsS[bucket].size(); i++)
 		{
 			size_t j = bucketsS[bucket][i];
@@ -254,32 +261,35 @@ void step2or7(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ost
 			assert(j <= textLen);
 			if (text[jminus1] >= text[j])
 			{
-				if (text[jminus1] == bucket)
-				{
-					std::cerr << text << "\n" << j << ", " << jminus1 << ", " << bucket << ", " << (int)text[jminus1] << "\n";
-				}
 				assert(text[jminus1] > bucket);
 				assert(text[jminus1] < maxAlphabet+1);
-				buckets[text[jminus1]].push_back(jminus1);
+				buckets[text[jminus1]][bucketsSize[text[jminus1]]] = jminus1;
+				bucketsSize[text[jminus1]]++;
 			}
 			else
 			{
 				assert(false);
 			}
 		}
+		freeMemory(bucketsS[bucket]);
 	}
 }
 
 //sorts (with step 2) the LMS-type substrings
 //call with result == nullptr to do step 3, otherwise 8
-template <class Alphabet>
-void step3or8(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSRight, size_t LMSRightSize, Alphabet* result, const std::vector<size_t>& charSum, const std::vector<size_t>& Lsum)
+template <class Alphabet, bool isStep8>
+void step3or8(const Alphabet* const text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSRight, size_t LMSRightSize, Alphabet* const result, const std::vector<size_t>& charSum, const std::vector<size_t>& Lsum)
 {
+	if (isStep8)
+	{
+		assert(result != nullptr);
+	}
 	std::vector<std::vector<size_t>> bucketsL(maxAlphabet+1);
-	std::vector<std::vector<size_t>> buckets(maxAlphabet+1); //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
+	std::vector<size_t*> buckets(maxAlphabet+1, nullptr); //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
+	std::vector<size_t> bucketsSize(maxAlphabet+1, 0);
 	for (size_t i = 0; i < maxAlphabet+1; i++)
 	{
-		buckets[i].reserve(charSum[i+1]-charSum[i]-Lsum[i]);
+		buckets[i] = new size_t[charSum[i+1]-charSum[i]-Lsum[i]];
 	}
 	assert(maxAlphabet < std::numeric_limits<int>::max());
 	for (size_t i = 0; i < LMSRightSize; i++)
@@ -291,7 +301,7 @@ void step3or8(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ost
 	for (int bucket = maxAlphabet; bucket >= 0; bucket--)
 	{
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
-		for (size_t i = 0; i < buckets[bucket].size(); i++)
+		for (size_t i = 0; i < bucketsSize[bucket]; i++)
 		{
 			size_t j = buckets[bucket][i];
 			size_t jminus1 = j-1;
@@ -301,7 +311,7 @@ void step3or8(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ost
 			}
 			assert(j <= textLen);
 			assert(text[j]+1 < maxAlphabet+1);
-			if (result != nullptr)
+			if (isStep8)
 			{
 				assert(i < charSum[text[j]+1]);
 				assert(i+1 <= charSum[text[j]+1]);
@@ -312,17 +322,19 @@ void step3or8(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ost
 			if (text[jminus1] <= text[j])
 			{
 				assert(text[jminus1] < maxAlphabet+1);
-				buckets[text[jminus1]].push_back(jminus1);
+				buckets[text[jminus1]][bucketsSize[text[jminus1]]] = jminus1;
+				bucketsSize[text[jminus1]]++;
 			}
 			else
 			{
 				assert(j != 0);
-				if (result == nullptr) //don't return anything for step 8
+				if (!isStep8) //don't return anything for step 8
 				{
 					out.write((char*)&j, sizeof(size_t));
 				}
 			}
 		}
+		delete [] buckets[bucket];
 		if (bucketsL[bucket].size() > 0)
 		{
 			for (size_t i = bucketsL[bucket].size()-1; ; i--)
@@ -338,7 +350,8 @@ void step3or8(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ost
 				{
 					assert(text[jminus1] < maxAlphabet+1);
 					assert(text[jminus1] < bucket);
-					buckets[text[jminus1]].push_back(jminus1);
+					buckets[text[jminus1]][bucketsSize[text[jminus1]]] = jminus1;
+					bucketsSize[text[jminus1]]++;
 				}
 				else
 				{
@@ -348,7 +361,8 @@ void step3or8(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ost
 				{
 					break;
 				}
-			}	
+			}
+			freeMemory(bucketsL[bucket]);
 		}
 	}
 }
@@ -605,7 +619,7 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	std::ostream secondWriter(&secondBuf);
 	std::istream secondReader(&secondBuf);
 
-	step2or7(source, sourceLen, maxAlphabet, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	step2or7<Alphabet, false>(source, sourceLen, maxAlphabet, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	freeMemory(LMSLeft);
 
 	std::vector<size_t> third(std::get<1>(prep), 0);
@@ -613,7 +627,7 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	std::ostream thirdWriter(&thirdBuf);
 	std::istream thirdReader(&thirdBuf);
 
-	step3or8(source, sourceLen, maxAlphabet, thirdWriter, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	step3or8<Alphabet, false>(source, sourceLen, maxAlphabet, thirdWriter, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	freeMemory(second);
 #ifndef NDEBUG
 	verifyLMSSubstringsAreSorted(source, sourceLen, third, std::get<2>(prep));
@@ -650,10 +664,10 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	std::ostream seventhWriter(&seventhBuf);
 	std::istream seventhReader(&seventhBuf);
 
-	step2or7(source, sourceLen, maxAlphabet, seventhWriter, sixthReader, sixth.size(), dest, charSum, std::get<0>(prep));
+	step2or7<Alphabet, true>(source, sourceLen, maxAlphabet, seventhWriter, sixthReader, sixth.size(), dest, charSum, std::get<0>(prep));
 	freeMemory(sixth);
 	std::ofstream dummyStream;
-	step3or8(source, sourceLen, maxAlphabet, dummyStream, seventhReader, std::get<1>(prep), dest, charSum, std::get<0>(prep));
+	step3or8<Alphabet, true>(source, sourceLen, maxAlphabet, dummyStream, seventhReader, std::get<1>(prep), dest, charSum, std::get<0>(prep));
 }
 
 template <class Alphabet>
@@ -697,14 +711,14 @@ void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, const std::st
 	std::ofstream secondWriter(secondFile, std::ios::binary);
 	std::ifstream LMSLeftReader(LMSLeftFile, std::ios::binary);
 
-	step2or7(source.data(), sourceLen, maxAlphabet, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	step2or7<Alphabet, false>(source.data(), sourceLen, maxAlphabet, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	secondWriter.close();
 	LMSLeftReader.close();
 
 	std::ofstream thirdWriter(thirdFile, std::ios::binary);
 	std::ifstream secondReader(secondFile, std::ios::binary);
 
-	step3or8(source.data(), sourceLen, maxAlphabet, thirdWriter, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	step3or8<Alphabet, false>(source.data(), sourceLen, maxAlphabet, thirdWriter, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	thirdWriter.close();
 	secondReader.close();
 
@@ -756,14 +770,14 @@ void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, const std::st
 	std::ofstream seventhWriter(seventhFile, std::ios::binary);
 	std::ifstream sixthReader(sixthFile, std::ios::binary);
 
-	step2or7(source.data(), sourceLen, maxAlphabet, seventhWriter, sixthReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
+	step2or7<Alphabet, true>(source.data(), sourceLen, maxAlphabet, seventhWriter, sixthReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
 	seventhWriter.close();
 	sixthReader.close();
 
 	std::ifstream seventhReader(seventhFile, std::ios::binary);
 
 	std::ofstream dummyStream;
-	step3or8(source.data(), sourceLen, maxAlphabet, dummyStream, seventhReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
+	step3or8<Alphabet, true>(source.data(), sourceLen, maxAlphabet, dummyStream, seventhReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
 	seventhReader.close();
 
 	writeVectorToFile(dest, destFile);
