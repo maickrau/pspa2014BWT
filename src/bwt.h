@@ -11,6 +11,21 @@
 #include <streambuf>
 #include <fstream>
 
+template <class Alphabet, class IndexType>
+void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet* dest);
+
+template <class Alphabet>
+void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet* dest);
+
+template <class Alphabet, class IndexType>
+void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlphabet, const std::string& destFile, bool addSentinel);
+
+template <class Alphabet>
+void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlphabet, const std::string& destFile, bool addSentinel);
+
+template <class Alphabet>
+void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, const std::string& destFile);
+
 std::string getTempFileName();
 
 template <class Type>
@@ -96,8 +111,8 @@ std::vector<size_t> charSums(const Alphabet* text, size_t textLen, size_t maxAlp
 }
 
 //returns random access written results in the tuple, and sequential access written results with streams
-template <class Alphabet>
-std::tuple<std::vector<size_t>, //L-counts
+template <class Alphabet, class IndexType>
+std::tuple<std::vector<IndexType>, //L-counts
            size_t               //count of LMS-type indices
 #ifndef NDEBUG
            ,std::vector<bool> //is S-type
@@ -105,7 +120,7 @@ std::tuple<std::vector<size_t>, //L-counts
            > 
 preprocess(std::istream& text, size_t textLen, size_t maxAlphabet, std::ostream& LMSLeftOut, std::ostream& charSumOut, std::ostream& LMSIndicesOut, bool addSentinel)
 {
-	std::tuple<std::vector<size_t>, 
+	std::tuple<std::vector<IndexType>, 
 	           size_t
 #ifndef NDEBUG
 	           ,std::vector<bool>
@@ -116,10 +131,10 @@ preprocess(std::istream& text, size_t textLen, size_t maxAlphabet, std::ostream&
 #ifndef NDEBUG
 	std::get<2>(ret).resize(textLen, false);
 #endif
-	std::vector<size_t> sums(maxAlphabet+1, 0);
-	std::vector<std::vector<size_t>> buckets(maxAlphabet+1);
-	size_t lastPossibleLMS = 0;
-	size_t lastCharacterBoundary = 0;
+	std::vector<IndexType> sums(maxAlphabet+1, 0);
+	std::vector<std::vector<IndexType>> buckets(maxAlphabet+1);
+	IndexType lastPossibleLMS = 0;
+	IndexType lastCharacterBoundary = 0;
 	bool lastWasLType = false;
 	Alphabet currentSymbol;
 	Alphabet nextSymbol;
@@ -158,7 +173,7 @@ preprocess(std::istream& text, size_t textLen, size_t maxAlphabet, std::ostream&
 			if (lastWasLType)
 			{
 				buckets[currentSymbol].push_back(lastPossibleLMS);
-				LMSIndicesOut.write((char*)&lastPossibleLMS, sizeof(size_t));
+				LMSIndicesOut.write((char*)&lastPossibleLMS, sizeof(IndexType));
 				assert(std::get<1>(ret) < textLen/2);
 				std::get<1>(ret)++;
 			}
@@ -179,19 +194,19 @@ preprocess(std::istream& text, size_t textLen, size_t maxAlphabet, std::ostream&
 #endif
 	sums[nextSymbol]++;
 	buckets[nextSymbol].push_back(textLen-1);
-	size_t lastIndex = textLen-1;
-	LMSIndicesOut.write((char*)&lastIndex, sizeof(size_t));
+	IndexType lastIndex = textLen-1;
+	LMSIndicesOut.write((char*)&lastIndex, sizeof(IndexType));
 	assert(std::get<1>(ret) < textLen/2);
 	std::get<1>(ret)++;
 
 	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
-	size_t charSumSum = 0;
-	charSumOut.write((char*)&charSumSum, sizeof(size_t));
+	IndexType charSumSum = 0;
+	charSumOut.write((char*)&charSumSum, sizeof(IndexType));
 	for (int i = 0; i < maxAlphabet+1; i++)
 	{
 		charSumSum = charSumSum+sums[i];
-		charSumOut.write((char*)&charSumSum, sizeof(size_t));
-		LMSLeftOut.write((char*)buckets[i].data(), buckets[i].size()*sizeof(size_t));
+		charSumOut.write((char*)&charSumSum, sizeof(IndexType));
+		LMSLeftOut.write((char*)buckets[i].data(), buckets[i].size()*sizeof(IndexType));
 		freeMemory(buckets[i]);
 	}
 	return ret;
@@ -199,25 +214,25 @@ preprocess(std::istream& text, size_t textLen, size_t maxAlphabet, std::ostream&
 
 //sorts (with step 3) the LMS-type substrings
 //call with result == nullptr to do step 2, otherwise step 7
-template <class Alphabet, bool isStep7>
-void step2or7(const Alphabet* const text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize, Alphabet* const result, const std::vector<size_t>& charSum, const std::vector<size_t>& Lsum)
+template <class Alphabet, class IndexType, bool isStep7>
+void step2or7(const Alphabet* const text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize, Alphabet* const result, const std::vector<IndexType>& charSum, const std::vector<IndexType>& Lsum)
 {
 	if (isStep7)
 	{
 		assert(result != nullptr);
 	}
-	std::vector<std::vector<size_t>> bucketsS(maxAlphabet+1);
-	std::vector<size_t*> buckets(maxAlphabet+1, nullptr); //A_l in paper
-	std::vector<size_t> bucketsSize(maxAlphabet+1, 0);
+	std::vector<std::vector<IndexType>> bucketsS(maxAlphabet+1);
+	std::vector<IndexType*> buckets(maxAlphabet+1, nullptr); //A_l in paper
+	std::vector<IndexType> bucketsSize(maxAlphabet+1, 0);
 	for (size_t i = 0; i < maxAlphabet+1; i++)
 	{
-		buckets[i] = new size_t[Lsum[i]];
+		buckets[i] = new IndexType[Lsum[i]];
 	}
 	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
 	for (size_t i = 0; i < LMSLeftSize; i++)
 	{
-		size_t index;
-		LMSLeft.read((char*)&index, sizeof(size_t));
+		IndexType index;
+		LMSLeft.read((char*)&index, sizeof(IndexType));
 		bucketsS[text[index]].push_back(index);
 	}
 	for (int bucket = 0; bucket < maxAlphabet+1; bucket++)
@@ -225,8 +240,8 @@ void step2or7(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
 		for (size_t i = 0; i < bucketsSize[bucket]; i++)
 		{
-			size_t j = buckets[bucket][i];
-			size_t jminus1 = j-1;
+			IndexType j = buckets[bucket][i];
+			IndexType jminus1 = j-1;
 			if (j == 0)
 			{
 				jminus1 = textLen-1;
@@ -246,14 +261,14 @@ void step2or7(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 			}
 			else
 			{
-				out.write((char*)&j, sizeof(size_t));
+				out.write((char*)&j, sizeof(IndexType));
 			}
 		}
 		delete [] buckets[bucket];
 		for (size_t i = 0; i < bucketsS[bucket].size(); i++)
 		{
-			size_t j = bucketsS[bucket][i];
-			size_t jminus1 = j-1;
+			IndexType j = bucketsS[bucket][i];
+			IndexType jminus1 = j-1;
 			if (j == 0)
 			{
 				jminus1 = textLen-1;
@@ -277,25 +292,25 @@ void step2or7(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 
 //sorts (with step 2) the LMS-type substrings
 //call with result == nullptr to do step 3, otherwise 8
-template <class Alphabet, bool isStep8>
-void step3or8(const Alphabet* const text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSRight, size_t LMSRightSize, Alphabet* const result, const std::vector<size_t>& charSum, const std::vector<size_t>& Lsum)
+template <class Alphabet, class IndexType, bool isStep8>
+void step3or8(const Alphabet* const text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSRight, size_t LMSRightSize, Alphabet* const result, const std::vector<IndexType>& charSum, const std::vector<IndexType>& Lsum)
 {
 	if (isStep8)
 	{
 		assert(result != nullptr);
 	}
-	std::vector<std::vector<size_t>> bucketsL(maxAlphabet+1);
-	std::vector<size_t*> buckets(maxAlphabet+1, nullptr); //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
-	std::vector<size_t> bucketsSize(maxAlphabet+1, 0);
+	std::vector<std::vector<IndexType>> bucketsL(maxAlphabet+1);
+	std::vector<IndexType*> buckets(maxAlphabet+1, nullptr); //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
+	std::vector<IndexType> bucketsSize(maxAlphabet+1, 0);
 	for (size_t i = 0; i < maxAlphabet+1; i++)
 	{
-		buckets[i] = new size_t[charSum[i+1]-charSum[i]-Lsum[i]];
+		buckets[i] = new IndexType[charSum[i+1]-charSum[i]-Lsum[i]];
 	}
 	assert(maxAlphabet < std::numeric_limits<int>::max());
 	for (size_t i = 0; i < LMSRightSize; i++)
 	{
-		size_t index;
-		LMSRight.read((char*)&index, sizeof(size_t));
+		IndexType index;
+		LMSRight.read((char*)&index, sizeof(IndexType));
 		bucketsL[text[index]].push_back(index);
 	}
 	for (int bucket = maxAlphabet; bucket >= 0; bucket--)
@@ -303,8 +318,8 @@ void step3or8(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
 		for (size_t i = 0; i < bucketsSize[bucket]; i++)
 		{
-			size_t j = buckets[bucket][i];
-			size_t jminus1 = j-1;
+			IndexType j = buckets[bucket][i];
+			IndexType jminus1 = j-1;
 			if (j == 0)
 			{
 				jminus1 = textLen-1;
@@ -330,7 +345,7 @@ void step3or8(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 				assert(j != 0);
 				if (!isStep8) //don't return anything for step 8
 				{
-					out.write((char*)&j, sizeof(size_t));
+					out.write((char*)&j, sizeof(IndexType));
 				}
 			}
 		}
@@ -339,8 +354,8 @@ void step3or8(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 		{
 			for (size_t i = bucketsL[bucket].size()-1; ; i--)
 			{
-				size_t j = bucketsL[bucket][i];
-				size_t jminus1 = j-1;
+				IndexType j = bucketsL[bucket][i];
+				IndexType jminus1 = j-1;
 				if (j == 0)
 				{
 					jminus1 = textLen-1;
@@ -479,28 +494,28 @@ int compareLMSSuffixes(const Alphabet* text, size_t textLen, size_t str1, size_t
 }
 
 //returns S'
-template <class Alphabet>
+template <class Alphabet, class IndexType>
 void step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize)
 {
 	std::vector<bool> LMSSubstringBorder(textLen, false);
 	for (size_t i = 0; i < LMSLeftSize; i++)
 	{
-		size_t index;
+		IndexType index;
 		assert(LMSLeft.good());
-		LMSLeft.read((char*)&index, sizeof(size_t));
+		LMSLeft.read((char*)&index, sizeof(IndexType));
 		LMSSubstringBorder[index] = true;
 	}
 	LMSLeft.clear();
 	LMSLeft.seekg(0);
 	assert(LMSLeft.good());
-	std::vector<size_t> sparseSPrime((textLen+1)/2, 0); //not sure if needs to round up, do it just in case
-	size_t currentName = LMSLeftSize+1;
-	size_t oldIndex = 0;
-	size_t index = 0;
+	std::vector<IndexType> sparseSPrime((textLen+1)/2, 0); //not sure if needs to round up, do it just in case
+	IndexType currentName = LMSLeftSize+1;
+	IndexType oldIndex = 0;
+	IndexType index = 0;
 	for (size_t i = 0; i < LMSLeftSize; i++)
 	{
 		assert(LMSLeft.good());
-		LMSLeft.read((char*)&index, sizeof(size_t));
+		LMSLeft.read((char*)&index, sizeof(IndexType));
 		if (i == 0 || !LMSSubstringsAreEqual(text, textLen, oldIndex, index, LMSSubstringBorder))
 		{
 			currentName--;
@@ -515,37 +530,163 @@ void step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ostrea
 		if (*i != 0)
 		{
 			assert(*i >= currentName);
-			size_t write = *i-currentName;
+			IndexType write = *i-currentName;
 			assert(write < LMSLeftSize);
-			out.write((char*)&write, sizeof(size_t));
+			out.write((char*)&write, sizeof(IndexType));
 		}
 	}
 }
 
-std::vector<size_t> step5(const std::vector<size_t>& Sprime);
-void step5InFile(const std::string& SprimeFile, const std::string& outFile, size_t SprimeSize);
+//do a counting sort on the rotated strings and pick the last element
+template <class IndexType>
+std::vector<IndexType> bwtDirectly(const std::vector<IndexType>& data)
+{
+	auto max = std::max_element(data.begin(), data.end());
+	assert(*max == data.size()-1);
+	std::vector<IndexType> location(*max+1, 0);
+	for (size_t i = 0; i < data.size(); i++)
+	{
+		location[data[i]] = i+1; //use indexes that start from 1 so 0 is reserved as "unused"
+	}
+	std::vector<IndexType> ret;
+	for (auto i = location.begin(); i != location.end(); i++)
+	{
+		if (*i != 0)
+		{
+			IndexType loc = *i-2;
+			if (*i == 1)
+			{
+				loc = data.size()-1;
+			}
+			ret.push_back(data[loc]);
+		}
+	}
+	return ret;
+}
+
+template <class IndexType>
+std::vector<IndexType> step5(const std::vector<IndexType>& Sprime)
+{
+	std::vector<bool> isUnique(Sprime.size(), true);
+	bool canCalculateDirectly = true;
+	for (auto i = Sprime.begin(); i != Sprime.end(); i++)
+	{
+		if (!isUnique[*i])
+		{
+			canCalculateDirectly = false;
+			break;
+		}
+		isUnique[*i] = false;
+	}
+	freeMemory(isUnique);
+	if (canCalculateDirectly)
+	{
+		return bwtDirectly(Sprime);
+	}
+	std::vector<IndexType> result(Sprime.size(), 0);
+	auto max = std::max_element(Sprime.begin(), Sprime.end());
+	bwt<IndexType>(Sprime.data(), Sprime.size(), *max, result.data());
+	return result;
+}
+
+template <class IndexType>
+void step5InFile(const std::string& SprimeFile, const std::string& outFile, size_t SprimeSize)
+{
+	std::vector<bool> isUnique(SprimeSize, true);
+	bool canCalculateDirectly = true;
+	IndexType index;
+	std::ifstream file(SprimeFile, std::ios::binary);
+	IndexType max = 0;
+	for (size_t i = 0; i < SprimeSize; i++)
+	{
+		file.read((char*)&index, sizeof(IndexType));
+		if (!isUnique[index])
+		{
+			canCalculateDirectly = false;
+		}
+		isUnique[index] = false;
+		if (index > max)
+		{
+			max = index;
+		}
+	}
+	file.close();
+	freeMemory(isUnique);
+	if (canCalculateDirectly)
+	{
+		std::vector<IndexType> SprimeVec = readVectorFromFile<IndexType>(SprimeFile, false);
+		std::vector<IndexType> result = bwtDirectly(SprimeVec);
+		writeVectorToFile(result, outFile);
+		return;
+	}
+	bwtInFiles<IndexType>(SprimeFile, SprimeSize, max, outFile, false);
+}
 
 std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector<size_t>& R);
 
-void alternateStep6a(std::ostream& SAinverse, std::istream& BWTprime, size_t BWTprimeSize);
-
-template <class Alphabet>
-std::vector<size_t> alternateStep6b(std::istream& SAinverse, std::istream& LMSIndices, size_t size)
+template <class IndexType>
+void alternateStep6a(std::ostream& SAinverse, std::istream& BWTprime, size_t BWTprimeSize)
 {
-	std::vector<size_t> ret(size, 0);
+	std::vector<IndexType> charNum(1, 0);
+	IndexType maxAlphabet = 0;
+	for (size_t i = 0; i < BWTprimeSize; i++)
+	{
+		IndexType read;
+		BWTprime.read((char*)&read, sizeof(IndexType));
+		if (read > maxAlphabet)
+		{
+			maxAlphabet = read;
+			charNum.resize(maxAlphabet+1);
+		}
+		charNum[read]++;
+	}
+	BWTprime.clear();
+	BWTprime.seekg(0);
+	std::vector<IndexType> charSum(maxAlphabet+2, 0);
+	for (IndexType i = 1; i < maxAlphabet+1; i++)
+	{
+		charSum[i] = charSum[i-1]+charNum[i-1];
+	}
+	charSum[maxAlphabet+1] = charSum[maxAlphabet]+charNum[maxAlphabet];
+	std::vector<IndexType> LFinverse(BWTprimeSize, 0);
+	std::vector<IndexType> usedSlots(maxAlphabet+1, 0);
+	for (size_t i = 0; i < BWTprimeSize; i++)
+	{
+		IndexType read;
+		BWTprime.read((char*)&read, sizeof(IndexType));
+		assert(usedSlots[read] < charSum[read+1]-charSum[read]);
+		LFinverse[charSum[read]+usedSlots[read]] = i;
+		usedSlots[read]++;
+	}
+	for (size_t i = 0; i <= maxAlphabet; i++)
+	{
+		assert(usedSlots[i] == charSum[i+1]-charSum[i]);
+	}
+	IndexType index = 0;
+	for (size_t i = 0; i < BWTprimeSize; i++)
+	{
+		SAinverse.write((char*)&LFinverse[index], sizeof(IndexType));
+		index = LFinverse[index];
+	}
+}
+
+template <class Alphabet, class IndexType>
+std::vector<IndexType> alternateStep6b(std::istream& SAinverse, std::istream& LMSIndices, size_t size)
+{
+	std::vector<IndexType> ret(size, 0);
 	for (size_t i = 0; i < size; i++)
 	{
-		size_t SA;
-		SAinverse.read((char*)&SA, sizeof(size_t));
-		size_t index;
-		LMSIndices.read((char*)&index, sizeof(size_t));
+		IndexType SA;
+		SAinverse.read((char*)&SA, sizeof(IndexType));
+		IndexType index;
+		LMSIndices.read((char*)&index, sizeof(IndexType));
 		ret[SA] = index;
 	}
 	return ret;
 }
 
-template <class Alphabet>
-void verifyLMSSubstringsAreSorted(const Alphabet* source, size_t sourceLen, const std::vector<size_t>& LMSIndices, const std::vector<bool>& isSType)
+template <class Alphabet, class IndexType>
+void verifyLMSSubstringsAreSorted(const Alphabet* source, size_t sourceLen, const std::vector<IndexType>& LMSIndices, const std::vector<bool>& isSType)
 {
 	std::vector<bool> substringBorders(sourceLen, false);
 	for (auto i = LMSIndices.begin(); i != LMSIndices.end(); i++)
@@ -564,8 +705,8 @@ void verifyLMSSubstringsAreSorted(const Alphabet* source, size_t sourceLen, cons
 	}
 }
 
-template <class Alphabet>
-void verifyLMSSuffixesAreSorted(const Alphabet* source, size_t sourceLen, const std::vector<size_t>& LMSIndices)
+template <class Alphabet, class IndexType>
+void verifyLMSSuffixesAreSorted(const Alphabet* source, size_t sourceLen, const std::vector<IndexType>& LMSIndices)
 {
 	for (size_t i = 0; i < LMSIndices.size()-1; i++)
 	{
@@ -587,17 +728,17 @@ void verifyLMSSuffixesAreSorted(const Alphabet* source, size_t sourceLen, const 
 //maxAlphabet is the largest alphabet that appears in the source
 //for unsigned char use maxAlphabet == 255
 //for larger alphabets (eg. size_t), take the largest number that actually appears and use that
-template <class Alphabet>
+template <class Alphabet, class IndexType>
 void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet* dest)
 {
-	std::vector<size_t> LMSLeft(sourceLen/2, 0);
-	std::vector<size_t> charSum(maxAlphabet+2, 0);
-	std::vector<size_t> LMSIndices(sourceLen/2, 0);
+	std::vector<IndexType> LMSLeft(sourceLen/2, 0);
+	std::vector<IndexType> charSum(maxAlphabet+2, 0);
+	std::vector<IndexType> LMSIndices(sourceLen/2, 0);
 
 	MemoryStreambuffer<Alphabet> sourceBuf((Alphabet*)source, sourceLen);
-	MemoryStreambuffer<size_t> LMSLeftBuf(LMSLeft.data(), sourceLen/2);
-	MemoryStreambuffer<size_t> charSumBuf(charSum.data(), maxAlphabet+2);
-	MemoryStreambuffer<size_t> LMSIndicesBuf(LMSIndices.data(), sourceLen/2);
+	MemoryStreambuffer<IndexType> LMSLeftBuf(LMSLeft.data(), sourceLen/2);
+	MemoryStreambuffer<IndexType> charSumBuf(charSum.data(), maxAlphabet+2);
+	MemoryStreambuffer<IndexType> LMSIndicesBuf(LMSIndices.data(), sourceLen/2);
 
 	std::istream sourceReader(&sourceBuf);
 	std::istream LMSLeftReader(&LMSLeftBuf);
@@ -608,77 +749,92 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	std::ostream charSumWriter(&charSumBuf);
 	std::ostream LMSIndicesWriter(&LMSIndicesBuf);
 
-	auto prep = preprocess<Alphabet>(sourceReader, sourceLen, maxAlphabet, LMSLeftWriter, charSumWriter, LMSIndicesWriter, false);
+	auto prep = preprocess<Alphabet, IndexType>(sourceReader, sourceLen, maxAlphabet, LMSLeftWriter, charSumWriter, LMSIndicesWriter, false);
 
 	assert(std::get<1>(prep) <= sourceLen/2);
 	LMSLeft.resize(std::get<1>(prep));
 	LMSIndices.resize(std::get<1>(prep));
 
-	std::vector<size_t> second(std::get<1>(prep), 0);
-	MemoryStreambuffer<size_t> secondBuf(second.data(), std::get<1>(prep));
+	std::vector<IndexType> second(std::get<1>(prep), 0);
+	MemoryStreambuffer<IndexType> secondBuf(second.data(), std::get<1>(prep));
 	std::ostream secondWriter(&secondBuf);
 	std::istream secondReader(&secondBuf);
 
-	step2or7<Alphabet, false>(source, sourceLen, maxAlphabet, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	step2or7<Alphabet, IndexType, false>(source, sourceLen, maxAlphabet, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	freeMemory(LMSLeft);
 
-	std::vector<size_t> third(std::get<1>(prep), 0);
-	MemoryStreambuffer<size_t> thirdBuf(third.data(), std::get<1>(prep));
+	std::vector<IndexType> third(std::get<1>(prep), 0);
+	MemoryStreambuffer<IndexType> thirdBuf(third.data(), std::get<1>(prep));
 	std::ostream thirdWriter(&thirdBuf);
 	std::istream thirdReader(&thirdBuf);
 
-	step3or8<Alphabet, false>(source, sourceLen, maxAlphabet, thirdWriter, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	step3or8<Alphabet, IndexType, false>(source, sourceLen, maxAlphabet, thirdWriter, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	freeMemory(second);
 #ifndef NDEBUG
-	verifyLMSSubstringsAreSorted(source, sourceLen, third, std::get<2>(prep));
+	verifyLMSSubstringsAreSorted<Alphabet, IndexType>(source, sourceLen, third, std::get<2>(prep));
 #endif
 
-	std::vector<size_t> fourth(std::get<1>(prep), 0);
-	MemoryStreambuffer<size_t> fourthBuf(fourth.data(), std::get<1>(prep));
+	std::vector<IndexType> fourth(std::get<1>(prep), 0);
+	MemoryStreambuffer<IndexType> fourthBuf(fourth.data(), std::get<1>(prep));
 	std::ostream fourthWriter(&fourthBuf);
 
-	step4(source, sourceLen, maxAlphabet, fourthWriter, thirdReader, std::get<1>(prep));
+	step4<Alphabet, IndexType>(source, sourceLen, maxAlphabet, fourthWriter, thirdReader, std::get<1>(prep));
 	freeMemory(third);
-	auto fifth = step5(fourth);
+	auto fifth = step5<IndexType>(fourth);
 
-	MemoryStreambuffer<size_t> fifthBuf(fifth.data(), std::get<1>(prep));
+	MemoryStreambuffer<IndexType> fifthBuf(fifth.data(), std::get<1>(prep));
 	std::istream fifthReader(&fifthBuf);
-	std::vector<size_t> SAinverse(std::get<1>(prep), 0);
-	MemoryStreambuffer<size_t> SAinverseBuf(SAinverse.data(), std::get<1>(prep));
+	std::vector<IndexType> SAinverse(std::get<1>(prep), 0);
+	MemoryStreambuffer<IndexType> SAinverseBuf(SAinverse.data(), std::get<1>(prep));
 	std::ostream SAinverseWriter(&SAinverseBuf);
 	std::istream SAinverseReader(&SAinverseBuf);
 
-	alternateStep6a(SAinverseWriter, fifthReader, std::get<1>(prep));
+	alternateStep6a<IndexType>(SAinverseWriter, fifthReader, std::get<1>(prep));
 	freeMemory(fifth);
-	auto sixth = alternateStep6b<size_t>(SAinverseReader, LMSIndicesReader, std::get<1>(prep));
+	auto sixth = alternateStep6b<Alphabet, IndexType>(SAinverseReader, LMSIndicesReader, std::get<1>(prep));
 	freeMemory(LMSIndices);
 	freeMemory(SAinverse);
 #ifndef NDEBUG
-	verifyLMSSuffixesAreSorted(source, sourceLen, sixth);
+	verifyLMSSuffixesAreSorted<Alphabet, IndexType>(source, sourceLen, sixth);
 #endif
-	MemoryStreambuffer<size_t> sixthBuf(sixth.data(), sixth.size());
+	MemoryStreambuffer<IndexType> sixthBuf(sixth.data(), sixth.size());
 	std::istream sixthReader(&sixthBuf);
 
-	std::vector<size_t> seventh(std::get<1>(prep), 0);
-	MemoryStreambuffer<size_t> seventhBuf(seventh.data(), std::get<1>(prep));
+	std::vector<IndexType> seventh(std::get<1>(prep), 0);
+	MemoryStreambuffer<IndexType> seventhBuf(seventh.data(), std::get<1>(prep));
 	std::ostream seventhWriter(&seventhBuf);
 	std::istream seventhReader(&seventhBuf);
 
-	step2or7<Alphabet, true>(source, sourceLen, maxAlphabet, seventhWriter, sixthReader, sixth.size(), dest, charSum, std::get<0>(prep));
+	step2or7<Alphabet, IndexType, true>(source, sourceLen, maxAlphabet, seventhWriter, sixthReader, sixth.size(), dest, charSum, std::get<0>(prep));
 	freeMemory(sixth);
 	std::ofstream dummyStream;
-	step3or8<Alphabet, true>(source, sourceLen, maxAlphabet, dummyStream, seventhReader, std::get<1>(prep), dest, charSum, std::get<0>(prep));
+	step3or8<Alphabet, IndexType, true>(source, sourceLen, maxAlphabet, dummyStream, seventhReader, std::get<1>(prep), dest, charSum, std::get<0>(prep));
 }
 
 template <class Alphabet>
-void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, const std::string& destFile, bool addSentinel)
+void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet* dest)
 {
-	size_t sourceLen = getFileLengthInAlphabets<Alphabet>(sourceFile);
-	if (addSentinel)
+	if (sourceLen < 255)
 	{
-		sourceLen++;
+		bwt<Alphabet, unsigned char>(source, sourceLen, maxAlphabet, dest);
 	}
-	
+	else if (sourceLen < std::numeric_limits<uint16_t>::max())
+	{
+		bwt<Alphabet, uint16_t>(source, sourceLen, maxAlphabet, dest);
+	}
+	else if (sourceLen < std::numeric_limits<uint32_t>::max())
+	{
+		bwt<Alphabet, uint32_t>(source, sourceLen, maxAlphabet, dest);
+	}
+	else
+	{
+		bwt<Alphabet, size_t>(source, sourceLen, maxAlphabet, dest);
+	}
+}
+
+template <class Alphabet, class IndexType>
+void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlphabet, const std::string& destFile, bool addSentinel)
+{
 	std::string LMSLeftFile = getTempFileName();
 	std::string charSumFile = getTempFileName();
 	std::string LMSIndicesFile = getTempFileName();
@@ -696,7 +852,7 @@ void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, const std::st
 	std::ofstream LMSIndicesWriter(LMSIndicesFile, std::ios::binary);
 	std::ifstream sourceReader(sourceFile, std::ios::binary);
 
-	auto prep = preprocess<Alphabet>(sourceReader, sourceLen, maxAlphabet, LMSLeftWriter, charSumWriter, LMSIndicesWriter, addSentinel);
+	auto prep = preprocess<Alphabet, IndexType>(sourceReader, sourceLen, maxAlphabet, LMSLeftWriter, charSumWriter, LMSIndicesWriter, addSentinel);
 	LMSLeftWriter.close();
 	charSumWriter.close();
 	LMSIndicesWriter.close();
@@ -704,26 +860,26 @@ void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, const std::st
 
 	assert(std::get<1>(prep) <= sourceLen/2);
 
-	std::vector<size_t> charSum = readVectorFromFile<size_t>(charSumFile, false);
+	std::vector<IndexType> charSum = readVectorFromFile<IndexType>(charSumFile, false);
 	std::vector<Alphabet> source;
 	source = readVectorFromFile<Alphabet>(sourceFile, addSentinel);
 
 	std::ofstream secondWriter(secondFile, std::ios::binary);
 	std::ifstream LMSLeftReader(LMSLeftFile, std::ios::binary);
 
-	step2or7<Alphabet, false>(source.data(), sourceLen, maxAlphabet, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	step2or7<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	secondWriter.close();
 	LMSLeftReader.close();
 
 	std::ofstream thirdWriter(thirdFile, std::ios::binary);
 	std::ifstream secondReader(secondFile, std::ios::binary);
 
-	step3or8<Alphabet, false>(source.data(), sourceLen, maxAlphabet, thirdWriter, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	step3or8<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, thirdWriter, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	thirdWriter.close();
 	secondReader.close();
 
 #ifndef NDEBUG
-	std::vector<size_t> third = readVectorFromFile<size_t>(thirdFile, false);
+	std::vector<IndexType> third = readVectorFromFile<IndexType>(thirdFile, false);
 	verifyLMSSubstringsAreSorted(source.data(), sourceLen, third, std::get<2>(prep));
 	freeMemory(third);
 #endif
@@ -731,25 +887,25 @@ void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, const std::st
 	std::ofstream fourthWriter(fourthFile, std::ios::binary);
 	std::ifstream thirdReader(thirdFile, std::ios::binary);
 
-	step4(source.data(), sourceLen, maxAlphabet, fourthWriter, thirdReader, std::get<1>(prep));
+	step4<Alphabet, IndexType>(source.data(), sourceLen, maxAlphabet, fourthWriter, thirdReader, std::get<1>(prep));
 	fourthWriter.close();
 	thirdReader.close();
 
 	freeMemory(source);
 
-	step5InFile(fourthFile, fifthFile, std::get<1>(prep));
+	step5InFile<IndexType>(fourthFile, fifthFile, std::get<1>(prep));
 
 	std::ofstream SAinverseWriter(SAinverseFile, std::ios::binary);
 	std::ifstream fifthReader(fifthFile, std::ios::binary);
 
-	alternateStep6a(SAinverseWriter, fifthReader, std::get<1>(prep));
+	alternateStep6a<IndexType>(SAinverseWriter, fifthReader, std::get<1>(prep));
 	SAinverseWriter.close();
 	fifthReader.close();
 
 	std::ifstream SAinverseReader(SAinverseFile, std::ios::binary);
 	std::ifstream LMSIndicesReader(LMSIndicesFile, std::ios::binary);
 
-	auto sixth = alternateStep6b<size_t>(SAinverseReader, LMSIndicesReader, std::get<1>(prep));
+	auto sixth = alternateStep6b<Alphabet, IndexType>(SAinverseReader, LMSIndicesReader, std::get<1>(prep));
 	SAinverseReader.close();
 	LMSIndicesReader.close();
 
@@ -770,14 +926,14 @@ void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, const std::st
 	std::ofstream seventhWriter(seventhFile, std::ios::binary);
 	std::ifstream sixthReader(sixthFile, std::ios::binary);
 
-	step2or7<Alphabet, true>(source.data(), sourceLen, maxAlphabet, seventhWriter, sixthReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
+	step2or7<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, seventhWriter, sixthReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
 	seventhWriter.close();
 	sixthReader.close();
 
 	std::ifstream seventhReader(seventhFile, std::ios::binary);
 
 	std::ofstream dummyStream;
-	step3or8<Alphabet, true>(source.data(), sourceLen, maxAlphabet, dummyStream, seventhReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
+	step3or8<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, dummyStream, seventhReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
 	seventhReader.close();
 
 	writeVectorToFile(dest, destFile);
@@ -796,24 +952,46 @@ void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, const std::st
 }
 
 template <class Alphabet>
+void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlphabet, const std::string& destFile, bool addSentinel)
+{
+	if (sourceLen < 255)
+	{
+		bwtInFiles<Alphabet, unsigned char>(sourceFile, sourceLen, maxAlphabet, destFile, addSentinel);
+	}
+	else if (sourceLen < std::numeric_limits<uint16_t>::max())
+	{
+		bwtInFiles<Alphabet, uint16_t>(sourceFile, sourceLen, maxAlphabet, destFile, addSentinel);
+	}
+	else if (sourceLen < std::numeric_limits<uint32_t>::max())
+	{
+		bwtInFiles<Alphabet, uint32_t>(sourceFile, sourceLen, maxAlphabet, destFile, addSentinel);
+	}
+	else
+	{
+		bwtInFiles<Alphabet, size_t>(sourceFile, sourceLen, maxAlphabet, destFile, addSentinel);
+	}
+}
+
+template <class Alphabet>
 void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, const std::string& destFile)
 {
-	bwtInFiles<Alphabet>(sourceFile, maxAlphabet, destFile, true);
+	size_t sourceLen = getFileLengthInAlphabets<Alphabet>(sourceFile)+1;
+	bwtInFiles<Alphabet>(sourceFile, sourceLen, maxAlphabet, destFile, true);
 }
 
 extern void bwt(const char* source, size_t sourceLen, char* dest);
 
-template <class Alphabet>
+template <class Alphabet, class IndexType>
 void inverseBWT(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet* dest)
 {
 	auto charSum = charSums(source, sourceLen, maxAlphabet);
-	std::vector<size_t> usedCharacters(maxAlphabet+1, 0);
-	std::vector<size_t> LFmapping(sourceLen, 0);
-	size_t index = 0;
+	std::vector<IndexType> usedCharacters(maxAlphabet+1, 0);
+	std::vector<IndexType> LFmapping(sourceLen, 0);
+	IndexType index = 0;
 	for (size_t i = 0; i < sourceLen; i++)
 	{
 		assert(source[i] < maxAlphabet+1);
-		assert(charSum[source[i]] < std::numeric_limits<size_t>::max()-usedCharacters[source[i]]);
+		assert(charSum[source[i]] < std::numeric_limits<IndexType>::max()-usedCharacters[source[i]]);
 		LFmapping[i] = charSum[source[i]]+usedCharacters[source[i]];
 		usedCharacters[source[i]]++;
 		if (source[i] == 0)
@@ -822,7 +1000,7 @@ void inverseBWT(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Al
 			index = i;
 		}
 	}
-	size_t loc = sourceLen-1;
+	IndexType loc = sourceLen-1;
 	do
 	{
 		assert(index < sourceLen);
@@ -831,6 +1009,27 @@ void inverseBWT(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Al
 		loc--;
 	} while (loc != 0);
 	dest[loc] = source[index];
+}
+
+template <class Alphabet>
+void inverseBWT(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet* dest)
+{
+	if (sourceLen < 255)
+	{
+		inverseBWT<Alphabet, unsigned char>(source, sourceLen, maxAlphabet, dest);
+	}
+	else if (sourceLen < std::numeric_limits<uint16_t>::max())
+	{
+		inverseBWT<Alphabet, uint16_t>(source, sourceLen, maxAlphabet, dest);
+	}
+	else if (sourceLen < std::numeric_limits<uint32_t>::max())
+	{
+		inverseBWT<Alphabet, uint32_t>(source, sourceLen, maxAlphabet, dest);
+	}
+	else
+	{
+		inverseBWT<Alphabet, size_t>(source, sourceLen, maxAlphabet, dest);
+	}
 }
 
 extern void inverseBWT(const char* source, size_t sourceLen, char* dest);
