@@ -493,10 +493,13 @@ int compareLMSSuffixes(const Alphabet* text, size_t textLen, size_t str1, size_t
 	assert(false);
 }
 
-//returns S'
+//returns whether the output can be directly BWT'd and the max alphabet
 template <class Alphabet, class IndexType>
-void step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize)
+std::tuple<bool, size_t> step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize)
 {
+	std::tuple<bool, size_t> ret;
+	std::get<0>(ret) = true;
+	std::get<1>(ret) = 0;
 	std::vector<bool> LMSSubstringBorder(textLen, false);
 	for (size_t i = 0; i < LMSLeftSize; i++)
 	{
@@ -520,6 +523,11 @@ void step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ostrea
 		{
 			currentName--;
 		}
+		else if (i != 0)
+		{
+			//lms substrings are equal
+			std::get<0>(ret) = false;
+		}
 		assert(index/2 < (textLen+1)/2);
 		sparseSPrime[index/2] = currentName;
 		assert(currentName > 0);
@@ -531,10 +539,15 @@ void step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ostrea
 		{
 			assert(*i >= currentName);
 			IndexType write = *i-currentName;
+			if (write > std::get<1>(ret))
+			{
+				std::get<1>(ret) = write;
+			}
 			assert(write < LMSLeftSize);
 			out.write((char*)&write, sizeof(IndexType));
 		}
 	}
+	return ret;
 }
 
 //do a counting sort on the rotated strings and pick the last element
@@ -565,61 +578,28 @@ std::vector<IndexType> bwtDirectly(const std::vector<IndexType>& data)
 }
 
 template <class IndexType>
-std::vector<IndexType> step5(const std::vector<IndexType>& Sprime)
+std::vector<IndexType> step5(const std::vector<IndexType>& Sprime, bool canBWTDirectly, size_t maxAlphabet)
 {
-	std::vector<bool> isUnique(Sprime.size(), true);
-	bool canCalculateDirectly = true;
-	for (auto i = Sprime.begin(); i != Sprime.end(); i++)
-	{
-		if (!isUnique[*i])
-		{
-			canCalculateDirectly = false;
-			break;
-		}
-		isUnique[*i] = false;
-	}
-	freeMemory(isUnique);
-	if (canCalculateDirectly)
+	if (canBWTDirectly)
 	{
 		return bwtDirectly(Sprime);
 	}
 	std::vector<IndexType> result(Sprime.size(), 0);
-	auto max = std::max_element(Sprime.begin(), Sprime.end());
-	bwt<IndexType>(Sprime.data(), Sprime.size(), *max, result.data());
+	bwt<IndexType>(Sprime.data(), Sprime.size(), maxAlphabet, result.data());
 	return result;
 }
 
 template <class IndexType>
-void step5InFile(const std::string& SprimeFile, const std::string& outFile, size_t SprimeSize)
+void step5InFile(const std::string& SprimeFile, const std::string& outFile, size_t SprimeSize, bool canBWTDirectly, size_t maxAlphabet)
 {
-	std::vector<bool> isUnique(SprimeSize, true);
-	bool canCalculateDirectly = true;
-	IndexType index;
-	std::ifstream file(SprimeFile, std::ios::binary);
-	IndexType max = 0;
-	for (size_t i = 0; i < SprimeSize; i++)
-	{
-		file.read((char*)&index, sizeof(IndexType));
-		if (!isUnique[index])
-		{
-			canCalculateDirectly = false;
-		}
-		isUnique[index] = false;
-		if (index > max)
-		{
-			max = index;
-		}
-	}
-	file.close();
-	freeMemory(isUnique);
-	if (canCalculateDirectly)
+	if (canBWTDirectly)
 	{
 		std::vector<IndexType> SprimeVec = readVectorFromFile<IndexType>(SprimeFile, false);
 		std::vector<IndexType> result = bwtDirectly(SprimeVec);
 		writeVectorToFile(result, outFile);
 		return;
 	}
-	bwtInFiles<IndexType>(SprimeFile, SprimeSize, max, outFile, false);
+	bwtInFiles<IndexType>(SprimeFile, SprimeSize, maxAlphabet, outFile, false);
 }
 
 std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector<size_t>& R);
@@ -778,9 +758,9 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 	MemoryStreambuffer<IndexType> fourthBuf(fourth.data(), std::get<1>(prep));
 	std::ostream fourthWriter(&fourthBuf);
 
-	step4<Alphabet, IndexType>(source, sourceLen, maxAlphabet, fourthWriter, thirdReader, std::get<1>(prep));
+	auto fourthRet = step4<Alphabet, IndexType>(source, sourceLen, maxAlphabet, fourthWriter, thirdReader, std::get<1>(prep));
 	freeMemory(third);
-	auto fifth = step5<IndexType>(fourth);
+	auto fifth = step5<IndexType>(fourth, std::get<0>(fourthRet), std::get<1>(fourthRet));
 
 	MemoryStreambuffer<IndexType> fifthBuf(fifth.data(), std::get<1>(prep));
 	std::istream fifthReader(&fifthBuf);
@@ -887,13 +867,13 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	std::ofstream fourthWriter(fourthFile, std::ios::binary);
 	std::ifstream thirdReader(thirdFile, std::ios::binary);
 
-	step4<Alphabet, IndexType>(source.data(), sourceLen, maxAlphabet, fourthWriter, thirdReader, std::get<1>(prep));
+	auto fourthRet = step4<Alphabet, IndexType>(source.data(), sourceLen, maxAlphabet, fourthWriter, thirdReader, std::get<1>(prep));
 	fourthWriter.close();
 	thirdReader.close();
 
 	freeMemory(source);
 
-	step5InFile<IndexType>(fourthFile, fifthFile, std::get<1>(prep));
+	step5InFile<IndexType>(fourthFile, fifthFile, std::get<1>(prep), std::get<0>(fourthRet), std::get<1>(fourthRet));
 
 	std::ofstream SAinverseWriter(SAinverseFile, std::ios::binary);
 	std::ifstream fifthReader(fifthFile, std::ios::binary);
