@@ -39,17 +39,6 @@ void bwt(const char* source, size_t sourceLen, char* dest)
 	bwt<unsigned char>((const unsigned char*)source, sourceLen, 255, (unsigned char*)dest);
 }
 
-std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector<size_t>& R)
-{
-	std::vector<size_t> ret;
-	for (auto i = BWTprime.begin(); i != BWTprime.end(); i++)
-	{
-		assert(*i < R.size());
-		ret.push_back(R[*i]);
-	}
-	return ret;
-}
-
 void inverseBWT(const char* source, size_t sourceLen, char* dest)
 {
 	inverseBWT<unsigned char>((const unsigned char*)source, sourceLen, 255, (unsigned char*)dest);

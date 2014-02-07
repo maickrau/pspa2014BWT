@@ -602,8 +602,6 @@ void step5InFile(const std::string& SprimeFile, const std::string& outFile, size
 	bwtInFiles<IndexType>(SprimeFile, SprimeSize, maxAlphabet, outFile, false);
 }
 
-std::vector<size_t> step6(const std::vector<size_t>& BWTprime, const std::vector<size_t>& R);
-
 template <class IndexType>
 void alternateStep6a(std::ostream& SAinverse, std::istream& BWTprime, size_t BWTprimeSize)
 {
