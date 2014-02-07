@@ -340,52 +340,18 @@ void doInFileTests()
 
 void bwtFromFileInMemory(const char* fileName)
 {
-	std::ifstream file(fileName, std::ifstream::binary);
-	file.seekg(0, std::ifstream::end);
-	size_t size = file.tellg();
-	std::cerr << size;
-	file.seekg(0, std::ifstream::beg);
-	char* source = new (std::nothrow) char[size+1](); //+1 for trailing \0
-	char* dest = new (std::nothrow) char[size+1]();
-	if (source == NULL || dest == NULL)
-	{
-		file.close();
-		std::cerr << "Could not allocate enough memory for in-memory BWT";
-		delete [] source;
-		delete [] dest;
-		return;
-	}
-	file.read(source, size);
-	file.close();
-	bwt(source, size+1, dest); //+1 for trailing \0
-	std::cout.write(dest, size+1); //+1 because there's a \0 in the middle
-	delete [] source;
-	delete [] dest;
+	std::vector<unsigned char> src = readVectorFromFile(fileName, true);
+	std::vector<unsigned char> dst(src.size(), 0);
+	bwt(src.data(), src.size(), dst.data());
+	std::cout.write(dst.data(), dst.size());
 }
 
 void inverseBwtFromFileInMemory(const char* fileName)
 {
-	std::ifstream file(fileName, std::ifstream::binary);
-	file.seekg(0, std::ifstream::end);
-	size_t size = file.tellg();
-	std::cerr << size;
-	file.seekg(0, std::ifstream::beg);
-	char* source = new (std::nothrow) char[size](); //no +1 because there's a \0 in the middle
-	char* dest = new (std::nothrow) char[size]();
-	if (source == NULL || dest == NULL)
-	{
-		file.close();
-		std::cerr << "Could not allocate enough memory for in-memory BWT";
-		delete [] source;
-		delete [] dest;
-		return;
-	}
-	file.read(source, size);
-	file.close();
-	inverseBWT(source, size, dest);
-	std::cout.write(dest, size);
-	delete [] source;
-	delete [] dest;
+	std::vector<unsigned char> src = readVectorFromFile(fileName, false);
+	std::vector<unsigned char> dst(src.size(), 0);
+	inverseBWT(src.data(), src.size(), dst.data());
+	std::cout.write(dest.data(), dst.size());
 }
 
 int main(int argc, char** argv)
