@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cstring>
 #include <fstream>
+#include <unistd.h>
 
 #include "bwt.h"
 
@@ -338,25 +339,95 @@ void doInFileTests()
 	testInFileBWT("minigenome");
 }
 
-void bwtFromFileInMemory(const char* fileName)
+void bwtFromFileInMemory(const std::string& inFile, const std::string& outFile)
 {
-	std::vector<unsigned char> src = readVectorFromFile(fileName, true);
+	std::vector<unsigned char> src = readVectorFromFile<unsigned char>(inFile, true);
 	std::vector<unsigned char> dst(src.size(), 0);
-	bwt(src.data(), src.size(), dst.data());
-	std::cout.write(dst.data(), dst.size());
+	bwt<unsigned char>(src.data(), src.size(), 255, dst.data());
+	writeVectorToFile(dst, outFile);
 }
 
-void inverseBwtFromFileInMemory(const char* fileName)
+void inverseBwtFromFileInMemory(const std::string& inFile, const std::string& outFile)
 {
-	std::vector<unsigned char> src = readVectorFromFile(fileName, false);
+	std::vector<unsigned char> src = readVectorFromFile<unsigned char>(inFile, false);
 	std::vector<unsigned char> dst(src.size(), 0);
-	inverseBWT(src.data(), src.size(), dst.data());
-	std::cout.write(dest.data(), dst.size());
+	inverseBWT<unsigned char>(src.data(), src.size(), 255, dst.data());
+	writeVectorToFile(dst, outFile);
+}
+
+void printHelp()
+{
+	std::cerr << "Usage:\n";
+	std::cerr << "\tbwt [MODE] -i in_file_name -o out_file_name\n\n";
+	std::cerr << "Modes:\n";
+	std::cerr << "\t-t run tests\n";
+	std::cerr << "\t-m in-memory BWT\n";
+	std::cerr << "\t-f in-files BWT\n";
+	std::cerr << "\t-u inverse BWT\n";
 }
 
 int main(int argc, char** argv)
 {
-	doTests();
-	doInFileTests();
-//	bwtFromFileInMemory("genome3");
+	enum Mode { TEST, IN_MEMORY, IN_FILE, INVERSE, HELP };
+	Mode mode = HELP;
+	int gotOption;
+	std::string inFile;
+	std::string outFile;
+	while ((gotOption = getopt(argc, argv, "tmfhui:o:")) != -1)
+	{
+		switch(gotOption)
+		{
+			case 't':
+				mode = TEST;
+				break;
+			case 'm':
+				mode = IN_MEMORY;
+				break;
+			case 'f':
+				mode = IN_FILE;
+				break;
+			case 'h':
+				mode = HELP;
+				break;
+			case 'u':
+				mode = INVERSE;
+				break;
+			case 'i':
+				inFile = optarg;
+				break;
+			case 'o':
+				outFile = optarg;
+				break;
+			default:
+				break;
+		}
+	}
+	if ((inFile == "" || outFile == "") && (mode == IN_MEMORY || mode == IN_FILE || mode == INVERSE))
+	{
+		mode = HELP;
+	}
+	switch(mode)
+	{
+		case TEST:
+			std::cerr << "Running tests\n";
+			doTests();
+			doInFileTests();
+			break;
+		case IN_MEMORY:
+			std::cerr << "Running in-memory BWT from file " << inFile << " to " << outFile << "\n";
+			bwtFromFileInMemory(inFile, outFile);
+			break;
+		case IN_FILE:
+			std::cerr << "Running in-file BWT from file " << inFile << " to " << outFile << "\n";
+			bwtInFiles<unsigned char>(inFile, 255, outFile);
+			break;
+		case INVERSE:
+			std::cerr << "Running inverse BWT from file " << inFile << " to " << outFile << "\n";
+			inverseBwtFromFileInMemory(inFile, outFile);
+			break;
+		case HELP:
+		default:
+			printHelp();
+			break;
+	}
 }
