@@ -3,6 +3,20 @@
 
 #include "bwt.h"
 
+#ifdef PRINTRSS
+#include <sys/time.h>
+#include <sys/resource.h>
+#endif
+
+void cerrMemoryUsage(const char* msg)
+{
+#ifdef PRINTRSS
+	struct rusage usage;
+	getrusage(RUSAGE_SELF, &usage);
+	std::cerr << msg << " maximum resident set " << usage.ru_maxrss << "kb\n";
+#endif
+}
+
 size_t nextTempFileName = 0;
 
 std::string getTempFileName()

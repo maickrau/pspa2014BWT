@@ -11,6 +11,8 @@
 #include <streambuf>
 #include <fstream>
 
+void cerrMemoryUsage(const char* msg);
+
 template <class Alphabet, class IndexType>
 void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet* dest);
 
@@ -813,6 +815,8 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 template <class Alphabet, class IndexType>
 void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlphabet, const std::string& destFile, bool addSentinel)
 {
+	cerrMemoryUsage("start of in-file BWT");
+
 	std::string LMSLeftFile = getTempFileName();
 	std::string charSumFile = getTempFileName();
 	std::string LMSIndicesFile = getTempFileName();
@@ -830,6 +834,8 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	std::ofstream LMSIndicesWriter(LMSIndicesFile, std::ios::binary);
 	std::ifstream sourceReader(sourceFile, std::ios::binary);
 
+	cerrMemoryUsage("before preprocessing");
+
 	auto prep = preprocess<Alphabet, IndexType>(sourceReader, sourceLen, maxAlphabet, LMSLeftWriter, charSumWriter, LMSIndicesWriter, addSentinel);
 	LMSLeftWriter.close();
 	charSumWriter.close();
@@ -845,6 +851,8 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	std::ofstream secondWriter(secondFile, std::ios::binary);
 	std::ifstream LMSLeftReader(LMSLeftFile, std::ios::binary);
 
+	cerrMemoryUsage("before step 2");
+
 	step2or7<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	secondWriter.close();
 	LMSLeftReader.close();
@@ -852,11 +860,15 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	std::ofstream thirdWriter(thirdFile, std::ios::binary);
 	std::ifstream secondReader(secondFile, std::ios::binary);
 
+	cerrMemoryUsage("before step 3");
+
 	step3or8<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, thirdWriter, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	thirdWriter.close();
 	secondReader.close();
 
 #ifndef NDEBUG
+	cerrMemoryUsage("before LMS substring order verification");
+
 	std::vector<IndexType> third = readVectorFromFile<IndexType>(thirdFile, false);
 	verifyLMSSubstringsAreSorted(source.data(), sourceLen, third, std::get<2>(prep));
 	freeMemory(third);
@@ -865,16 +877,22 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	std::ofstream fourthWriter(fourthFile, std::ios::binary);
 	std::ifstream thirdReader(thirdFile, std::ios::binary);
 
+	cerrMemoryUsage("before step 4");
+
 	auto fourthRet = step4<Alphabet, IndexType>(source.data(), sourceLen, maxAlphabet, fourthWriter, thirdReader, std::get<1>(prep));
 	fourthWriter.close();
 	thirdReader.close();
 
 	freeMemory(source);
 
+	cerrMemoryUsage("before step 5");
+
 	step5InFile<IndexType>(fourthFile, fifthFile, std::get<1>(prep), std::get<0>(fourthRet), std::get<1>(fourthRet));
 
 	std::ofstream SAinverseWriter(SAinverseFile, std::ios::binary);
 	std::ifstream fifthReader(fifthFile, std::ios::binary);
+
+	cerrMemoryUsage("before step 6a");
 
 	alternateStep6a<IndexType>(SAinverseWriter, fifthReader, std::get<1>(prep));
 	SAinverseWriter.close();
@@ -882,6 +900,8 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	std::ifstream SAinverseReader(SAinverseFile, std::ios::binary);
 	std::ifstream LMSIndicesReader(LMSIndicesFile, std::ios::binary);
+
+	cerrMemoryUsage("before step 6b");
 
 	auto sixth = alternateStep6b<Alphabet, IndexType>(SAinverseReader, LMSIndicesReader, std::get<1>(prep));
 	SAinverseReader.close();
@@ -895,6 +915,8 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	source = readVectorFromFile<Alphabet>(sourceFile, addSentinel);
 #ifndef NDEBUG
+	cerrMemoryUsage("before LMS suffix order verification");
+
 	verifyLMSSuffixesAreSorted(source.data(), sourceLen, sixth);
 	freeMemory(sixth);
 #endif
@@ -904,11 +926,15 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	std::ofstream seventhWriter(seventhFile, std::ios::binary);
 	std::ifstream sixthReader(sixthFile, std::ios::binary);
 
+	cerrMemoryUsage("before step 7");
+
 	step2or7<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, seventhWriter, sixthReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
 	seventhWriter.close();
 	sixthReader.close();
 
 	std::ifstream seventhReader(seventhFile, std::ios::binary);
+
+	cerrMemoryUsage("before step 8");
 
 	std::ofstream dummyStream;
 	step3or8<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, dummyStream, seventhReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
@@ -927,6 +953,8 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	remove(SAinverseFile.c_str());
 	remove(sixthFile.c_str());
 	remove(seventhFile.c_str());
+
+	cerrMemoryUsage("end of BWT");
 }
 
 template <class Alphabet>
