@@ -215,7 +215,6 @@ preprocess(std::istream& text, size_t textLen, size_t maxAlphabet, std::ostream&
 }
 
 //sorts (with step 3) the LMS-type substrings
-//call with result == nullptr to do step 2, otherwise step 7
 template <class Alphabet, class IndexType, bool isStep7>
 void step2or7(const Alphabet* const text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize, Alphabet* const result, const std::vector<IndexType>& charSum, const std::vector<IndexType>& Lsum)
 {
@@ -223,24 +222,23 @@ void step2or7(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 	{
 		assert(result != nullptr);
 	}
-	std::vector<std::vector<IndexType>> bucketsS(maxAlphabet+1);
-	std::vector<IndexType*> buckets(maxAlphabet+1, nullptr); //A_l in paper
-	std::vector<IndexType> bucketsSize(maxAlphabet+1, 0);
-	for (size_t i = 0; i < maxAlphabet+1; i++)
-	{
-		buckets[i] = new IndexType[Lsum[i]];
-	}
+	std::vector<std::vector<IndexType>> buckets(maxAlphabet+1); //A_l in paper
+	std::vector<IndexType> numbersOutputted(maxAlphabet+1);
 	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
 	for (size_t i = 0; i < LMSLeftSize; i++)
 	{
 		IndexType index;
 		LMSLeft.read((char*)&index, sizeof(IndexType));
-		bucketsS[text[index]].push_back(index);
+		buckets[text[index]+1].push_back(index);
+	}
+	for (size_t i = 0; i < maxAlphabet+1; i++)
+	{
+		buckets[i].reserve(buckets[i].size()+Lsum[i]);
 	}
 	for (int bucket = 0; bucket < maxAlphabet+1; bucket++)
 	{
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
-		for (size_t i = 0; i < bucketsSize[bucket]; i++)
+		for (size_t i = 0; i < buckets[bucket].size(); i++)
 		{
 			IndexType j = buckets[bucket][i];
 			IndexType jminus1 = j-1;
@@ -248,52 +246,34 @@ void step2or7(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 			{
 				jminus1 = textLen-1;
 			}
-			if (isStep7)
-			{
-				assert(charSum[text[j]]+i < textLen);
-				assert(i < charSum[text[j]+1]-charSum[text[j]]);
-				result[charSum[text[j]]+i] = text[jminus1];
-			}
 			assert(j <= textLen);
 			if (text[jminus1] >= text[j])
 			{
 				assert(text[jminus1] < maxAlphabet+1);
-				buckets[text[jminus1]][bucketsSize[text[jminus1]]] = jminus1;
-				bucketsSize[text[jminus1]]++;
+				buckets[text[jminus1]].push_back(jminus1);
+				if (isStep7)
+				{
+					IndexType writeIndex = jminus1-1;
+					if (jminus1 == 0)
+					{
+						writeIndex = textLen-1;
+					}
+					assert(charSum[text[jminus1]]+numbersOutputted[text[jminus1]] < textLen);
+					assert(numbersOutputted[text[jminus1]] < charSum[text[jminus1]+1]-charSum[text[jminus1]]);
+					result[charSum[text[jminus1]]+numbersOutputted[text[jminus1]]] = text[writeIndex];
+					numbersOutputted[text[jminus1]]++;
+				}
 			}
 			else
 			{
 				out.write((char*)&j, sizeof(IndexType));
 			}
 		}
-		delete [] buckets[bucket];
-		for (size_t i = 0; i < bucketsS[bucket].size(); i++)
-		{
-			IndexType j = bucketsS[bucket][i];
-			IndexType jminus1 = j-1;
-			if (j == 0)
-			{
-				jminus1 = textLen-1;
-			}
-			assert(j <= textLen);
-			if (text[jminus1] >= text[j])
-			{
-				assert(text[jminus1] > bucket);
-				assert(text[jminus1] < maxAlphabet+1);
-				buckets[text[jminus1]][bucketsSize[text[jminus1]]] = jminus1;
-				bucketsSize[text[jminus1]]++;
-			}
-			else
-			{
-				assert(false);
-			}
-		}
-		freeMemory(bucketsS[bucket]);
+		freeMemory(buckets[bucket]);
 	}
 }
 
 //sorts (with step 2) the LMS-type substrings
-//call with result == nullptr to do step 3, otherwise 8
 template <class Alphabet, class IndexType, bool isStep8>
 void step3or8(const Alphabet* const text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSRight, size_t LMSRightSize, Alphabet* const result, const std::vector<IndexType>& charSum, const std::vector<IndexType>& Lsum)
 {
@@ -301,24 +281,26 @@ void step3or8(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 	{
 		assert(result != nullptr);
 	}
-	std::vector<std::vector<IndexType>> bucketsL(maxAlphabet+1);
-	std::vector<IndexType*> buckets(maxAlphabet+1, nullptr); //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
-	std::vector<IndexType> bucketsSize(maxAlphabet+1, 0);
-	for (size_t i = 0; i < maxAlphabet+1; i++)
-	{
-		buckets[i] = new IndexType[charSum[i+1]-charSum[i]-Lsum[i]];
-	}
+	std::vector<std::vector<IndexType>> buckets(maxAlphabet+1); //A_s in paper, note that the contents are in reverse order, eg. bucket['a'][0] is the rightmost item in bucket a, not leftmost
+	std::vector<IndexType> numbersOutputted(maxAlphabet+1);
 	assert(maxAlphabet < std::numeric_limits<int>::max());
 	for (size_t i = 0; i < LMSRightSize; i++)
 	{
 		IndexType index;
 		LMSRight.read((char*)&index, sizeof(IndexType));
-		bucketsL[text[index]].push_back(index);
+		assert(index < textLen);
+		assert(text[index] > 0);
+		buckets[text[index]-1].push_back(index);
+	}
+	for (size_t i = 0; i < maxAlphabet+1; i++)
+	{
+		std::reverse(buckets[i].begin(), buckets[i].end());
+		buckets[i].reserve(buckets[i].size()+(charSum[i+1]-charSum[i]-Lsum[i]));
 	}
 	for (int bucket = maxAlphabet; bucket >= 0; bucket--)
 	{
 		//can't use iterators because indices may be pushed into current bucket, and that can invalidate iterators
-		for (size_t i = 0; i < bucketsSize[bucket]; i++)
+		for (size_t i = 0; i < buckets[bucket].size(); i++)
 		{
 			IndexType j = buckets[bucket][i];
 			IndexType jminus1 = j-1;
@@ -327,20 +309,25 @@ void step3or8(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 				jminus1 = textLen-1;
 			}
 			assert(j <= textLen);
-			assert(text[j]+1 < maxAlphabet+1);
-			if (isStep8)
-			{
-				assert(i < charSum[text[j]+1]);
-				assert(i+1 <= charSum[text[j]+1]);
-				assert(i+charSum[text[j]] < charSum[text[j]+1]);
-				assert(charSum[text[j]+1]-i-1 < textLen);
-				result[charSum[text[j]+1]-i-1] = text[jminus1];
-			}
+			assert(text[j] < maxAlphabet+1);
 			if (text[jminus1] <= text[j])
 			{
 				assert(text[jminus1] < maxAlphabet+1);
-				buckets[text[jminus1]][bucketsSize[text[jminus1]]] = jminus1;
-				bucketsSize[text[jminus1]]++;
+				buckets[text[jminus1]].push_back(jminus1);
+				if (isStep8)
+				{
+					IndexType writeIndex = jminus1-1;
+					if (jminus1 == 0)
+					{
+						writeIndex = textLen-1;
+					}
+					assert(numbersOutputted[text[jminus1]] < charSum[text[jminus1]+1]);
+					assert(numbersOutputted[text[jminus1]]+1 <= charSum[text[jminus1]+1]);
+					assert(numbersOutputted[text[jminus1]]+charSum[text[jminus1]] < charSum[text[jminus1]+1]);
+					assert(charSum[text[jminus1]+1]-numbersOutputted[text[jminus1]]-1 < textLen);
+					result[charSum[text[jminus1]+1]-numbersOutputted[text[jminus1]]-1] = text[writeIndex];
+					numbersOutputted[text[jminus1]]++;
+				}
 			}
 			else
 			{
@@ -351,36 +338,7 @@ void step3or8(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 				}
 			}
 		}
-		delete [] buckets[bucket];
-		if (bucketsL[bucket].size() > 0)
-		{
-			for (size_t i = bucketsL[bucket].size()-1; ; i--)
-			{
-				IndexType j = bucketsL[bucket][i];
-				IndexType jminus1 = j-1;
-				if (j == 0)
-				{
-					jminus1 = textLen-1;
-				}
-				assert(j <= textLen);
-				if (text[jminus1] <= text[j])
-				{
-					assert(text[jminus1] < maxAlphabet+1);
-					assert(text[jminus1] < bucket);
-					buckets[text[jminus1]][bucketsSize[text[jminus1]]] = jminus1;
-					bucketsSize[text[jminus1]]++;
-				}
-				else
-				{
-					assert(false);
-				}
-				if (i == 0)
-				{
-					break;
-				}
-			}
-			freeMemory(bucketsL[bucket]);
-		}
+		freeMemory(buckets[bucket]);
 	}
 }
 
