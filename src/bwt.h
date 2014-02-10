@@ -99,9 +99,9 @@ template <class ItemType, class PriorityType>
 class WeirdPriorityQueue
 {
 public:
-	WeirdPriorityQueue(size_t maxPriority, size_t k) :
+	WeirdPriorityQueue(size_t maxPriority, size_t maxBytes) :
 		numItems(0),
-		k(k),
+		k(maxBytes/sizeof(ItemType)),
 		currentStart(0),
 		currentPos(0),
 		currentEnd(k),
@@ -1105,7 +1105,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 2");
 
-	step2or7LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, 10000000, secondWriter, LMSLeftReader, std::get<1>(prep), (WeirdPriorityQueue<Alphabet, IndexType>*)nullptr, charSum, std::get<0>(prep));
+	step2or7LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, 50000000, secondWriter, LMSLeftReader, std::get<1>(prep), (WeirdPriorityQueue<Alphabet, IndexType>*)nullptr, charSum, std::get<0>(prep));
 	secondWriter.close();
 	LMSLeftReader.close();
 
@@ -1114,7 +1114,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 3");
 
-	step3or8LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, 10000000, thirdWriter, secondReader, std::get<1>(prep), (WeirdPriorityQueue<Alphabet, IndexType>*)nullptr, charSum, std::get<0>(prep));
+	step3or8LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, 50000000, thirdWriter, secondReader, std::get<1>(prep), (WeirdPriorityQueue<Alphabet, IndexType>*)nullptr, charSum, std::get<0>(prep));
 	thirdWriter.close();
 	secondReader.close();
 
@@ -1131,7 +1131,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 4");
 
-	auto fourthRet = step4LowMemory<Alphabet, IndexType>(source.data(), sourceLen, maxAlphabet, 10000000, fourthWriter, thirdReader, std::get<1>(prep));
+	auto fourthRet = step4LowMemory<Alphabet, IndexType>(source.data(), sourceLen, maxAlphabet, 50000000, fourthWriter, thirdReader, std::get<1>(prep));
 	fourthWriter.close();
 	thirdReader.close();
 
@@ -1178,9 +1178,9 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 7");
 
-	WeirdPriorityQueue<Alphabet, IndexType> result(sourceLen, 10000000);
+	WeirdPriorityQueue<Alphabet, IndexType> result(sourceLen, 25000000);
 
-	step2or7LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, 10000000, seventhWriter, sixthReader, std::get<1>(prep), &result, charSum, std::get<0>(prep));
+	step2or7LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, 25000000, seventhWriter, sixthReader, std::get<1>(prep), &result, charSum, std::get<0>(prep));
 	seventhWriter.close();
 	sixthReader.close();
 
@@ -1189,7 +1189,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	cerrMemoryUsage("before step 8");
 
 	std::ofstream dummyStream;
-	step3or8LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, 10000000, dummyStream, seventhReader, std::get<1>(prep), &result, charSum, std::get<0>(prep));
+	step3or8LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, 25000000, dummyStream, seventhReader, std::get<1>(prep), &result, charSum, std::get<0>(prep));
 	seventhReader.close();
 
 	std::ofstream resultWriter(destFile, std::ios::binary);
