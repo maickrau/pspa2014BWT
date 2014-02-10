@@ -273,6 +273,162 @@ void step2or7(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 	}
 }
 
+//sorts (with step 3) the LMS-type substrings
+template <class Alphabet, class IndexType, bool isStep7>
+void step2or7LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlphabet, size_t k, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize, Alphabet* const result, const std::vector<IndexType>& charSum, const std::vector<IndexType>& Lsum)
+{
+	if (isStep7)
+	{
+		assert(result != nullptr);
+	}
+	size_t numPs = (textLen+k-1)/k;
+	std::vector<std::string> PNames;
+	std::vector<std::fstream*> P; //no copy/move for streams, use pointer
+	for (size_t i = 0; i < numPs; i++)
+	{
+		PNames.push_back(getTempFileName());
+		std::fstream* stream = new std::fstream(PNames.back(), std::ios_base::in | std::ios_base::out | std::ios_base::binary);
+		assert(stream->good());
+		P.push_back(stream);
+	}
+	std::vector<IndexType> Aprime(k, 0);
+	std::vector<bool> AprimeUsed(k, false);
+	std::vector<IndexType> numbersArrayed(maxAlphabet+1, 0);
+	std::vector<IndexType> numbersOutputted(maxAlphabet+1);
+	assert(charSum[maxAlphabet+1] == textLen);
+	assert(charSum[0] == 0);
+	assert(charSum[1] == 1);
+	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
+	for (size_t i = 0; i < LMSLeftSize; i++)
+	{
+		IndexType index;
+		LMSLeft.read((char*)&index, sizeof(IndexType));
+		IndexType pos = charSum[text[index]]+Lsum[text[index]]+numbersArrayed[text[index]];
+		assert(text[index] <= maxAlphabet);
+		assert(charSum[text[index]] < textLen);
+		assert(charSum[text[index]]+Lsum[text[index]] <= charSum[text[index]+1]);
+		assert(Lsum[text[index]] <= charSum[text[index]+1]-charSum[text[index]]);
+		assert(numbersArrayed[text[index]] < charSum[text[index]+1]-charSum[text[index]]-Lsum[text[index]]);
+		assert(pos < textLen);
+		if (pos < k)
+		{
+			Aprime[pos] = index;
+			AprimeUsed[pos] = true;
+		}
+		else
+		{
+			size_t Pnum = pos/k;
+			assert(Pnum < numPs);
+			assert(P[Pnum]->good());
+			P[Pnum]->write((char*)&index, sizeof(IndexType));
+			assert(P[Pnum]->good());
+			P[Pnum]->write((char*)&pos, sizeof(IndexType));
+		}
+		numbersArrayed[text[index]]++;
+	}
+	for (size_t i = 0; i < maxAlphabet+1; i++)
+	{
+		numbersArrayed[i] = 0;
+	}
+	size_t Aprimestart = 0;
+	for (size_t loc = 0; loc < textLen; loc++)
+	{
+		if (loc == Aprimestart+k)
+		{
+			for (size_t i = 0; i < AprimeUsed.size(); i++)
+			{
+				AprimeUsed[i] = false;
+			}
+			Aprimestart += k;
+			size_t Pnum = (Aprimestart/k);
+			assert(Pnum < numPs);
+			P[Pnum]->flush();
+			P[Pnum]->seekg(0, std::ios::beg);
+			assert(P[Pnum]->good());
+			while (!P[Pnum]->eof())
+			{
+				IndexType index, pos;
+				assert(P[Pnum]->good());
+				P[Pnum]->read((char*)&index, sizeof(IndexType));
+				if (P[Pnum]->eof())
+				{
+					break;
+				}
+				assert(P[Pnum]->good());
+				P[Pnum]->read((char*)&pos, sizeof(IndexType));
+				assert(pos >= Aprimestart);
+				assert(pos < Aprimestart+k);
+				Aprime[pos-Aprimestart] = index;
+				AprimeUsed[pos-Aprimestart] = true;
+			}
+		}
+		assert(loc >= Aprimestart);
+		assert(loc < Aprimestart+k);
+		if (!AprimeUsed[loc-Aprimestart])
+		{
+			continue;
+		}
+		IndexType j = Aprime[loc-Aprimestart];
+		IndexType jminus1 = j-1;
+		if (j == 0)
+		{
+			jminus1 = textLen-1;
+		}
+		assert(j < textLen);
+		assert(text[jminus1] <= maxAlphabet);
+		assert(text[j] <= maxAlphabet);
+		if (text[jminus1] >= text[j])
+		{
+			IndexType pos = charSum[text[jminus1]]+numbersArrayed[text[jminus1]];
+			if (pos <= loc)
+			{
+				std::cout << "\"" << text[jminus1] << "\" (" << (int)text[jminus1] << ") " << charSum[text[jminus1]] << "/" << textLen << "\n";
+				std::cout << numbersArrayed[text[jminus1]] << "+" << charSum[text[jminus1]] << "=" << pos << "\n";
+				std::cout << loc << "\n";
+			}
+			assert(pos > loc);
+			assert(pos < textLen);
+			if (pos < Aprimestart+k)
+			{
+				Aprime[pos-Aprimestart] = jminus1;
+				AprimeUsed[pos-Aprimestart] = true;
+			}
+			else
+			{
+				size_t Pnum = pos/k;
+				assert(Pnum < numPs);
+				assert(P[Pnum]->good());
+				P[Pnum]->write((char*)&jminus1, sizeof(IndexType));
+				assert(P[Pnum]->good());
+				P[Pnum]->write((char*)&pos, sizeof(IndexType));
+			}
+			numbersArrayed[text[jminus1]]++;
+			if (isStep7)
+			{
+				IndexType writeIndex = jminus1-1;
+				if (jminus1 == 0)
+				{
+					writeIndex = textLen-1;
+				}
+				assert(charSum[text[jminus1]]+numbersOutputted[text[jminus1]] < textLen);
+				assert(numbersOutputted[text[jminus1]] < charSum[text[jminus1]+1]-charSum[text[jminus1]]);
+				result[charSum[text[jminus1]]+numbersOutputted[text[jminus1]]] = text[writeIndex];
+				numbersOutputted[text[jminus1]]++;
+			}
+		}
+		else
+		{
+			out.write((char*)&j, sizeof(IndexType));
+		}
+	}
+	for (size_t i = 0; i < numPs; i++)
+	{
+		P[i]->close();
+		delete P[i];
+		remove(PNames[i].c_str());
+	}
+}
+
 //sorts (with step 2) the LMS-type substrings
 template <class Alphabet, class IndexType, bool isStep8>
 void step3or8(const Alphabet* const text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSRight, size_t LMSRightSize, Alphabet* const result, const std::vector<IndexType>& charSum, const std::vector<IndexType>& Lsum)
@@ -339,6 +495,161 @@ void step3or8(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 			}
 		}
 		freeMemory(buckets[bucket]);
+	}
+}
+
+//sorts (with step 2) the LMS-type substrings
+template <class Alphabet, class IndexType, bool isStep8>
+void step3or8LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlphabet, size_t k, std::ostream& out, std::istream& LMSRight, size_t LMSRightSize, Alphabet* const result, const std::vector<IndexType>& charSum, const std::vector<IndexType>& Lsum)
+{
+	if (isStep8)
+	{
+		assert(result != nullptr);
+	}
+	size_t numPs = (textLen+k-1)/k;
+	std::vector<std::string> PNames;
+	std::vector<std::fstream*> P; //no copy/move for streams, use pointer
+	for (size_t i = 0; i < numPs; i++)
+	{
+		PNames.push_back(getTempFileName());
+		std::fstream* stream = new std::fstream(PNames.back(), std::ios_base::in | std::ios_base::out | std::ios_base::binary);
+		assert(stream->good());
+		P.push_back(stream);
+	}
+	std::vector<IndexType> Aprime(k, 0); //backwards, Aprime[0] is rightmost element
+	std::vector<bool> AprimeUsed(k, false);
+	std::vector<IndexType> numbersArrayed(maxAlphabet+1, 0);
+	std::vector<IndexType> numbersOutputted(maxAlphabet+1);
+	assert(charSum[maxAlphabet+1] == textLen);
+	assert(charSum[0] == 0);
+	assert(charSum[1] == 1);
+	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
+	for (size_t i = 0; i < LMSRightSize; i++)
+	{
+		IndexType index;
+		LMSRight.read((char*)&index, sizeof(IndexType));
+		IndexType reversePos = (charSum[text[index]]+numbersArrayed[text[index]]);
+		assert(reversePos < textLen);
+		IndexType pos = textLen-reversePos-1; //positions have 0 as rightmost element
+		assert(text[index] <= maxAlphabet);
+		assert(pos < textLen);
+		if (pos < k)
+		{
+			Aprime[pos] = index;
+			AprimeUsed[pos] = true;
+		}
+		else
+		{
+			size_t Pnum = pos/k;
+			assert(Pnum < numPs);
+			assert(P[Pnum]->good());
+			P[Pnum]->write((char*)&index, sizeof(IndexType));
+			assert(P[Pnum]->good());
+			P[Pnum]->write((char*)&pos, sizeof(IndexType));
+		}
+		numbersArrayed[text[index]]++;
+	}
+	for (size_t i = 0; i < maxAlphabet+1; i++)
+	{
+		numbersArrayed[i] = 0;
+	}
+	size_t Aprimestart = 0;
+	for (size_t loc = 0; loc < textLen; loc++)
+	{
+		if (loc == Aprimestart+k)
+		{
+			for (size_t i = 0; i < AprimeUsed.size(); i++)
+			{
+				AprimeUsed[i] = false;
+			}
+			Aprimestart += k;
+			size_t Pnum = (Aprimestart/k);
+			assert(Pnum < numPs);
+			P[Pnum]->flush();
+			P[Pnum]->seekg(0, std::ios::beg);
+			assert(P[Pnum]->good());
+			while (!P[Pnum]->eof())
+			{
+				IndexType index, pos;
+				assert(P[Pnum]->good());
+				P[Pnum]->read((char*)&index, sizeof(IndexType));
+				if (P[Pnum]->eof())
+				{
+					break;
+				}
+				assert(P[Pnum]->good());
+				P[Pnum]->read((char*)&pos, sizeof(IndexType));
+				assert(pos >= Aprimestart);
+				assert(pos < Aprimestart+k);
+				Aprime[pos-Aprimestart] = index;
+				AprimeUsed[pos-Aprimestart] = true;
+			}
+		}
+		assert(loc >= Aprimestart);
+		assert(loc < Aprimestart+k);
+		if (!AprimeUsed[loc-Aprimestart])
+		{
+			continue;
+		}
+		IndexType j = Aprime[loc-Aprimestart];
+		IndexType jminus1 = j-1;
+		if (j == 0)
+		{
+			jminus1 = textLen-1;
+		}
+		assert(j < textLen);
+		assert(text[jminus1] <= maxAlphabet);
+		assert(text[j] <= maxAlphabet);
+		if (text[jminus1] <= text[j])
+		{
+			IndexType reversePos = charSum[text[jminus1]+1]-numbersArrayed[text[jminus1]]-1;
+			assert(reversePos < textLen);
+			IndexType pos = textLen-reversePos-1; //positions have 0 as rightmost element
+			assert(pos < textLen);
+			assert(pos > loc);
+			if (pos < Aprimestart+k)
+			{
+				Aprime[pos-Aprimestart] = jminus1;
+				AprimeUsed[pos-Aprimestart] = true;
+			}
+			else
+			{
+				size_t Pnum = pos/k;
+				assert(Pnum < numPs);
+				assert(P[Pnum]->good());
+				P[Pnum]->write((char*)&jminus1, sizeof(IndexType));
+				assert(P[Pnum]->good());
+				P[Pnum]->write((char*)&pos, sizeof(IndexType));
+			}
+			numbersArrayed[text[jminus1]]++;
+			if (isStep8)
+			{
+				IndexType writeIndex = jminus1-1;
+				if (jminus1 == 0)
+				{
+					writeIndex = textLen-1;
+				}
+				assert(numbersOutputted[text[jminus1]] < charSum[text[jminus1]+1]);
+				assert(numbersOutputted[text[jminus1]]+1 <= charSum[text[jminus1]+1]);
+				assert(numbersOutputted[text[jminus1]]+charSum[text[jminus1]] < charSum[text[jminus1]+1]);
+				assert(charSum[text[jminus1]+1]-numbersOutputted[text[jminus1]]-1 < textLen);
+				result[charSum[text[jminus1]+1]-numbersOutputted[text[jminus1]]-1] = text[writeIndex];
+				numbersOutputted[text[jminus1]]++;
+			}
+		}
+		else
+		{
+			if (!isStep8) //no output for step 8
+			{
+				out.write((char*)&j, sizeof(IndexType));
+			}
+		}
+	}
+	for (size_t i = 0; i < numPs; i++)
+	{
+		P[i]->close();
+		delete P[i];
+		remove(PNames[i].c_str());
 	}
 }
 
@@ -811,7 +1122,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 2");
 
-	step2or7<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	step2or7LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, 10000000, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	secondWriter.close();
 	LMSLeftReader.close();
 
@@ -820,7 +1131,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 3");
 
-	step3or8<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, thirdWriter, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	step3or8LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, 10000000, thirdWriter, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
 	thirdWriter.close();
 	secondReader.close();
 
@@ -886,7 +1197,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 7");
 
-	step2or7<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, seventhWriter, sixthReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
+	step2or7LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, 10000000, seventhWriter, sixthReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
 	seventhWriter.close();
 	sixthReader.close();
 
@@ -895,7 +1206,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	cerrMemoryUsage("before step 8");
 
 	std::ofstream dummyStream;
-	step3or8<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, dummyStream, seventhReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
+	step3or8LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, 10000000, dummyStream, seventhReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
 	seventhReader.close();
 
 	writeVectorToFile(dest, destFile);
