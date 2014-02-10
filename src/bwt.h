@@ -95,6 +95,125 @@ protected:
 	}
 };
 
+template <class ItemType, class PriorityType>
+class WeirdPriorityQueue
+{
+public:
+	WeirdPriorityQueue(size_t maxPriority, size_t k) :
+		numItems(0),
+		k(k),
+		currentStart(0),
+		currentPos(0),
+		currentEnd(k),
+		maxPriority(maxPriority),
+		currentItems(k),
+		used(k, false),
+		fileNames(),
+		streams()
+	{
+		size_t maxFile = (maxPriority+k-1)/k;
+		for (size_t i = 0; i < maxFile; i++)
+		{
+			fileNames.push_back(getTempFileName());
+			std::fstream* stream = new std::fstream(fileNames.back(), std::ios_base::in | std::ios_base::out | std::ios_base::binary);
+			assert(stream->good());
+			streams.push_back(stream);
+		}
+	};
+	WeirdPriorityQueue(const WeirdPriorityQueue& second) = delete;
+	WeirdPriorityQueue& operator=(const WeirdPriorityQueue& second) = delete;
+	WeirdPriorityQueue(WeirdPriorityQueue&& second) = delete;
+	WeirdPriorityQueue& operator=(WeirdPriorityQueue&& second) = delete;
+	~WeirdPriorityQueue()
+	{
+		assert(fileNames.size() == streams.size());
+		for (size_t i = 0; i < fileNames.size(); i++)
+		{
+			streams[i]->close();
+			delete streams[i];
+			remove(fileNames[i].c_str());
+		}
+	};
+	ItemType get()
+	{
+		assert(currentPos <= k);
+		if (currentPos == k)
+		{
+			for (size_t i = 0; i < k; i++)
+			{
+				used[i] = false;
+			}
+			currentPos = 0;
+			currentStart += k;
+			currentEnd += k;
+			size_t fileN = currentStart/k;
+			assert(fileN < streams.size());
+			streams[fileN]->flush();
+			streams[fileN]->seekg(0, std::ios::beg);
+			while (true)
+			{
+				ItemType item;
+				PriorityType priority;
+				assert(streams[fileN]->good());
+				streams[fileN]->read((char*)&item, sizeof(ItemType));
+				if (streams[fileN]->eof())
+				{
+					break;
+				}
+				assert(streams[fileN]->good());
+				streams[fileN]->read((char*)&priority, sizeof(PriorityType));
+				assert(priority >= currentStart);
+				assert(priority < currentEnd);
+				currentItems[priority-currentStart] = item;
+				used[priority-currentStart] = true;
+			}
+		}
+		while (!used[currentPos])
+		{
+			currentPos++;
+			if (currentPos == k)
+			{
+				return get();
+			}
+		}
+		currentPos++;
+		numItems--;
+		assert(currentPos > 0);
+		return currentItems[currentPos-1];
+	};
+	void insert(ItemType item, PriorityType priority)
+	{
+		assert(priority < maxPriority);
+		assert(priority >= currentStart+currentPos);
+		numItems++;
+		if (priority < currentEnd)
+		{
+			currentItems[priority-currentStart] = item;
+			used[priority-currentStart] = true;
+			return;
+		}
+		size_t fileN = priority/k;
+		assert(fileN < streams.size());
+		assert(streams[fileN]->good());
+		streams[fileN]->write((char*)&item, sizeof(ItemType));
+		assert(streams[fileN]->good());
+		streams[fileN]->write((char*)&priority, sizeof(PriorityType));
+	};
+	size_t size() { return numItems; };
+	bool empty() { return numItems == 0; };
+private:
+	size_t numItems;
+	size_t k;
+	size_t currentStart;
+	size_t currentPos;
+	size_t currentEnd;
+	size_t maxPriority;
+	std::vector<ItemType> currentItems;
+	std::vector<bool> used;
+	std::vector<std::string> fileNames;
+	std::vector<std::fstream*> streams;
+};
+
 template <class Alphabet>
 std::vector<size_t> charSums(const Alphabet* text, size_t textLen, size_t maxAlphabet)
 {
@@ -281,94 +400,24 @@ void step2or7LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlp
 	{
 		assert(result != nullptr);
 	}
-	size_t numPs = (textLen+k-1)/k;
-	std::vector<std::string> PNames;
-	std::vector<std::fstream*> P; //no copy/move for streams, use pointer
-	for (size_t i = 0; i < numPs; i++)
-	{
-		PNames.push_back(getTempFileName());
-		std::fstream* stream = new std::fstream(PNames.back(), std::ios_base::in | std::ios_base::out | std::ios_base::binary);
-		assert(stream->good());
-		P.push_back(stream);
-	}
-	std::vector<IndexType> Aprime(k, 0);
-	std::vector<bool> AprimeUsed(k, false);
-	std::vector<IndexType> numbersArrayed(maxAlphabet+1, 0);
-	std::vector<IndexType> numbersOutputted(maxAlphabet+1);
-	assert(charSum[maxAlphabet+1] == textLen);
-	assert(charSum[0] == 0);
-	assert(charSum[1] == 1);
-	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
+	std::vector<size_t> numbersArrayed(maxAlphabet+1, 0);
+	std::vector<size_t> numbersOutputted(maxAlphabet+1, 0);
+	WeirdPriorityQueue<IndexType, IndexType> priorities(textLen, k);
 	for (size_t i = 0; i < LMSLeftSize; i++)
 	{
 		IndexType index;
 		LMSLeft.read((char*)&index, sizeof(IndexType));
 		IndexType pos = charSum[text[index]]+Lsum[text[index]]+numbersArrayed[text[index]];
-		assert(text[index] <= maxAlphabet);
-		assert(charSum[text[index]] < textLen);
-		assert(charSum[text[index]]+Lsum[text[index]] <= charSum[text[index]+1]);
-		assert(Lsum[text[index]] <= charSum[text[index]+1]-charSum[text[index]]);
-		assert(numbersArrayed[text[index]] < charSum[text[index]+1]-charSum[text[index]]-Lsum[text[index]]);
-		assert(pos < textLen);
-		if (pos < k)
-		{
-			Aprime[pos] = index;
-			AprimeUsed[pos] = true;
-		}
-		else
-		{
-			size_t Pnum = pos/k;
-			assert(Pnum < numPs);
-			assert(P[Pnum]->good());
-			P[Pnum]->write((char*)&index, sizeof(IndexType));
-			assert(P[Pnum]->good());
-			P[Pnum]->write((char*)&pos, sizeof(IndexType));
-		}
+		priorities.insert(index, pos);
 		numbersArrayed[text[index]]++;
 	}
 	for (size_t i = 0; i < maxAlphabet+1; i++)
 	{
 		numbersArrayed[i] = 0;
 	}
-	size_t Aprimestart = 0;
-	for (size_t loc = 0; loc < textLen; loc++)
+	while (!priorities.empty())
 	{
-		if (loc == Aprimestart+k)
-		{
-			for (size_t i = 0; i < AprimeUsed.size(); i++)
-			{
-				AprimeUsed[i] = false;
-			}
-			Aprimestart += k;
-			size_t Pnum = (Aprimestart/k);
-			assert(Pnum < numPs);
-			P[Pnum]->flush();
-			P[Pnum]->seekg(0, std::ios::beg);
-			assert(P[Pnum]->good());
-			while (!P[Pnum]->eof())
-			{
-				IndexType index, pos;
-				assert(P[Pnum]->good());
-				P[Pnum]->read((char*)&index, sizeof(IndexType));
-				if (P[Pnum]->eof())
-				{
-					break;
-				}
-				assert(P[Pnum]->good());
-				P[Pnum]->read((char*)&pos, sizeof(IndexType));
-				assert(pos >= Aprimestart);
-				assert(pos < Aprimestart+k);
-				Aprime[pos-Aprimestart] = index;
-				AprimeUsed[pos-Aprimestart] = true;
-			}
-		}
-		assert(loc >= Aprimestart);
-		assert(loc < Aprimestart+k);
-		if (!AprimeUsed[loc-Aprimestart])
-		{
-			continue;
-		}
-		IndexType j = Aprime[loc-Aprimestart];
+		IndexType j = priorities.get();
 		IndexType jminus1 = j-1;
 		if (j == 0)
 		{
@@ -380,28 +429,7 @@ void step2or7LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlp
 		if (text[jminus1] >= text[j])
 		{
 			IndexType pos = charSum[text[jminus1]]+numbersArrayed[text[jminus1]];
-			if (pos <= loc)
-			{
-				std::cout << "\"" << text[jminus1] << "\" (" << (int)text[jminus1] << ") " << charSum[text[jminus1]] << "/" << textLen << "\n";
-				std::cout << numbersArrayed[text[jminus1]] << "+" << charSum[text[jminus1]] << "=" << pos << "\n";
-				std::cout << loc << "\n";
-			}
-			assert(pos > loc);
-			assert(pos < textLen);
-			if (pos < Aprimestart+k)
-			{
-				Aprime[pos-Aprimestart] = jminus1;
-				AprimeUsed[pos-Aprimestart] = true;
-			}
-			else
-			{
-				size_t Pnum = pos/k;
-				assert(Pnum < numPs);
-				assert(P[Pnum]->good());
-				P[Pnum]->write((char*)&jminus1, sizeof(IndexType));
-				assert(P[Pnum]->good());
-				P[Pnum]->write((char*)&pos, sizeof(IndexType));
-			}
+			priorities.insert(jminus1, pos);
 			numbersArrayed[text[jminus1]]++;
 			if (isStep7)
 			{
@@ -420,12 +448,6 @@ void step2or7LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlp
 		{
 			out.write((char*)&j, sizeof(IndexType));
 		}
-	}
-	for (size_t i = 0; i < numPs; i++)
-	{
-		P[i]->close();
-		delete P[i];
-		remove(PNames[i].c_str());
 	}
 }
 
@@ -506,121 +528,36 @@ void step3or8LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlp
 	{
 		assert(result != nullptr);
 	}
-	size_t numPs = (textLen+k-1)/k;
-	std::vector<std::string> PNames;
-	std::vector<std::fstream*> P; //no copy/move for streams, use pointer
-	for (size_t i = 0; i < numPs; i++)
-	{
-		PNames.push_back(getTempFileName());
-		std::fstream* stream = new std::fstream(PNames.back(), std::ios_base::in | std::ios_base::out | std::ios_base::binary);
-		assert(stream->good());
-		P.push_back(stream);
-	}
-	std::vector<IndexType> Aprime(k, 0); //backwards, Aprime[0] is rightmost element
-	std::vector<bool> AprimeUsed(k, false);
+	WeirdPriorityQueue<IndexType, IndexType> priorities(textLen, k);
 	std::vector<IndexType> numbersArrayed(maxAlphabet+1, 0);
 	std::vector<IndexType> numbersOutputted(maxAlphabet+1);
-	assert(charSum[maxAlphabet+1] == textLen);
-	assert(charSum[0] == 0);
-	assert(charSum[1] == 1);
-	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
 	for (size_t i = 0; i < LMSRightSize; i++)
 	{
 		IndexType index;
 		LMSRight.read((char*)&index, sizeof(IndexType));
 		IndexType reversePos = (charSum[text[index]]+numbersArrayed[text[index]]);
-		assert(reversePos < textLen);
 		IndexType pos = textLen-reversePos-1; //positions have 0 as rightmost element
-		assert(text[index] <= maxAlphabet);
-		assert(pos < textLen);
-		if (pos < k)
-		{
-			Aprime[pos] = index;
-			AprimeUsed[pos] = true;
-		}
-		else
-		{
-			size_t Pnum = pos/k;
-			assert(Pnum < numPs);
-			assert(P[Pnum]->good());
-			P[Pnum]->write((char*)&index, sizeof(IndexType));
-			assert(P[Pnum]->good());
-			P[Pnum]->write((char*)&pos, sizeof(IndexType));
-		}
+		priorities.insert(index, pos);
 		numbersArrayed[text[index]]++;
 	}
 	for (size_t i = 0; i < maxAlphabet+1; i++)
 	{
 		numbersArrayed[i] = 0;
 	}
-	size_t Aprimestart = 0;
-	for (size_t loc = 0; loc < textLen; loc++)
+	while (!priorities.empty())
 	{
-		if (loc == Aprimestart+k)
-		{
-			for (size_t i = 0; i < AprimeUsed.size(); i++)
-			{
-				AprimeUsed[i] = false;
-			}
-			Aprimestart += k;
-			size_t Pnum = (Aprimestart/k);
-			assert(Pnum < numPs);
-			P[Pnum]->flush();
-			P[Pnum]->seekg(0, std::ios::beg);
-			assert(P[Pnum]->good());
-			while (!P[Pnum]->eof())
-			{
-				IndexType index, pos;
-				assert(P[Pnum]->good());
-				P[Pnum]->read((char*)&index, sizeof(IndexType));
-				if (P[Pnum]->eof())
-				{
-					break;
-				}
-				assert(P[Pnum]->good());
-				P[Pnum]->read((char*)&pos, sizeof(IndexType));
-				assert(pos >= Aprimestart);
-				assert(pos < Aprimestart+k);
-				Aprime[pos-Aprimestart] = index;
-				AprimeUsed[pos-Aprimestart] = true;
-			}
-		}
-		assert(loc >= Aprimestart);
-		assert(loc < Aprimestart+k);
-		if (!AprimeUsed[loc-Aprimestart])
-		{
-			continue;
-		}
-		IndexType j = Aprime[loc-Aprimestart];
+		IndexType j = priorities.get();
 		IndexType jminus1 = j-1;
 		if (j == 0)
 		{
 			jminus1 = textLen-1;
 		}
-		assert(j < textLen);
-		assert(text[jminus1] <= maxAlphabet);
-		assert(text[j] <= maxAlphabet);
 		if (text[jminus1] <= text[j])
 		{
 			IndexType reversePos = charSum[text[jminus1]+1]-numbersArrayed[text[jminus1]]-1;
 			assert(reversePos < textLen);
 			IndexType pos = textLen-reversePos-1; //positions have 0 as rightmost element
-			assert(pos < textLen);
-			assert(pos > loc);
-			if (pos < Aprimestart+k)
-			{
-				Aprime[pos-Aprimestart] = jminus1;
-				AprimeUsed[pos-Aprimestart] = true;
-			}
-			else
-			{
-				size_t Pnum = pos/k;
-				assert(Pnum < numPs);
-				assert(P[Pnum]->good());
-				P[Pnum]->write((char*)&jminus1, sizeof(IndexType));
-				assert(P[Pnum]->good());
-				P[Pnum]->write((char*)&pos, sizeof(IndexType));
-			}
+			priorities.insert(jminus1, pos);
 			numbersArrayed[text[jminus1]]++;
 			if (isStep8)
 			{
@@ -644,12 +581,6 @@ void step3or8LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlp
 				out.write((char*)&j, sizeof(IndexType));
 			}
 		}
-	}
-	for (size_t i = 0; i < numPs; i++)
-	{
-		P[i]->close();
-		delete P[i];
-		remove(PNames[i].c_str());
 	}
 }
 
