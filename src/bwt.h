@@ -752,6 +752,58 @@ std::tuple<bool, size_t> step4(const Alphabet* text, size_t textLen, size_t maxA
 	return ret;
 }
 
+template <class Alphabet, class IndexType>
+std::tuple<bool, size_t> step4LowMemory(const Alphabet* text, size_t textLen, size_t maxAlphabet, size_t k, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize)
+{
+	std::tuple<bool, size_t> ret;
+	std::get<0>(ret) = true;
+	std::get<1>(ret) = 0;
+	std::vector<bool> LMSSubstringBorder(textLen, false);
+	for (size_t i = 0; i < LMSLeftSize; i++)
+	{
+		IndexType index;
+		assert(LMSLeft.good());
+		LMSLeft.read((char*)&index, sizeof(IndexType));
+		LMSSubstringBorder[index] = true;
+	}
+	LMSLeft.clear();
+	LMSLeft.seekg(0);
+	assert(LMSLeft.good());
+	WeirdPriorityQueue<IndexType, IndexType> sparseSPrime((textLen+1)/2, k);
+	IndexType currentName = LMSLeftSize+1;
+	IndexType oldIndex = 0;
+	IndexType index = 0;
+	for (size_t i = 0; i < LMSLeftSize; i++)
+	{
+		assert(LMSLeft.good());
+		LMSLeft.read((char*)&index, sizeof(IndexType));
+		if (i == 0 || !LMSSubstringsAreEqual(text, textLen, oldIndex, index, LMSSubstringBorder))
+		{
+			currentName--;
+		}
+		else if (i != 0)
+		{
+			//lms substrings are equal
+			std::get<0>(ret) = false;
+		}
+		assert(index/2 < (textLen+1)/2);
+		sparseSPrime.insert(currentName, index/2);
+		assert(currentName > 0);
+		oldIndex = index;
+	}
+	while (!sparseSPrime.empty())
+	{
+		IndexType write = sparseSPrime.get()-currentName;
+		if (write > std::get<1>(ret))
+		{
+			std::get<1>(ret) = write;
+		}
+		assert(write < LMSLeftSize);
+		out.write((char*)&write, sizeof(IndexType));
+	}
+	return ret;
+}
+
 //do a counting sort on the rotated strings and pick the last element
 template <class IndexType>
 std::vector<IndexType> bwtDirectly(const std::vector<IndexType>& data)
@@ -1079,7 +1131,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 4");
 
-	auto fourthRet = step4<Alphabet, IndexType>(source.data(), sourceLen, maxAlphabet, fourthWriter, thirdReader, std::get<1>(prep));
+	auto fourthRet = step4LowMemory<Alphabet, IndexType>(source.data(), sourceLen, maxAlphabet, 10000000, fourthWriter, thirdReader, std::get<1>(prep));
 	fourthWriter.close();
 	thirdReader.close();
 
