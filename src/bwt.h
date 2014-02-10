@@ -20,13 +20,13 @@ template <class Alphabet>
 void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet* dest);
 
 template <class Alphabet, class IndexType>
-void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlphabet, const std::string& destFile, bool addSentinel);
+void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlphabet, size_t maxMemory, const std::string& destFile, bool addSentinel);
 
 template <class Alphabet>
-void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlphabet, const std::string& destFile, bool addSentinel);
+void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlphabet, size_t maxMemory, const std::string& destFile, bool addSentinel);
 
 template <class Alphabet>
-void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, const std::string& destFile);
+void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, size_t maxMemory, const std::string& destFile);
 
 std::string getTempFileName();
 
@@ -844,7 +844,7 @@ std::vector<IndexType> step5(const std::vector<IndexType>& Sprime, bool canBWTDi
 }
 
 template <class IndexType>
-void step5InFile(const std::string& SprimeFile, const std::string& outFile, size_t SprimeSize, bool canBWTDirectly, size_t maxAlphabet)
+void step5InFile(const std::string& SprimeFile, const std::string& outFile, size_t maxMemory, size_t SprimeSize, bool canBWTDirectly, size_t maxAlphabet)
 {
 	if (canBWTDirectly)
 	{
@@ -853,7 +853,7 @@ void step5InFile(const std::string& SprimeFile, const std::string& outFile, size
 		writeVectorToFile(result, outFile);
 		return;
 	}
-	bwtInFiles<IndexType>(SprimeFile, SprimeSize, maxAlphabet, outFile, false);
+	bwtInFiles<IndexType>(SprimeFile, SprimeSize, maxAlphabet, maxMemory, outFile, false);
 }
 
 template <class IndexType>
@@ -1065,7 +1065,7 @@ void bwt(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet*
 }
 
 template <class Alphabet, class IndexType>
-void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlphabet, const std::string& destFile, bool addSentinel)
+void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlphabet, size_t maxMemory, const std::string& destFile, bool addSentinel)
 {
 	cerrMemoryUsage("start of in-file BWT");
 
@@ -1105,7 +1105,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 2");
 
-	step2or7LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, 50000000, secondWriter, LMSLeftReader, std::get<1>(prep), (WeirdPriorityQueue<Alphabet, IndexType>*)nullptr, charSum, std::get<0>(prep));
+	step2or7LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, maxMemory, secondWriter, LMSLeftReader, std::get<1>(prep), (WeirdPriorityQueue<Alphabet, IndexType>*)nullptr, charSum, std::get<0>(prep));
 	secondWriter.close();
 	LMSLeftReader.close();
 
@@ -1114,7 +1114,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 3");
 
-	step3or8LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, 50000000, thirdWriter, secondReader, std::get<1>(prep), (WeirdPriorityQueue<Alphabet, IndexType>*)nullptr, charSum, std::get<0>(prep));
+	step3or8LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, maxMemory, thirdWriter, secondReader, std::get<1>(prep), (WeirdPriorityQueue<Alphabet, IndexType>*)nullptr, charSum, std::get<0>(prep));
 	thirdWriter.close();
 	secondReader.close();
 
@@ -1131,7 +1131,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 4");
 
-	auto fourthRet = step4LowMemory<Alphabet, IndexType>(source.data(), sourceLen, maxAlphabet, 50000000, fourthWriter, thirdReader, std::get<1>(prep));
+	auto fourthRet = step4LowMemory<Alphabet, IndexType>(source.data(), sourceLen, maxAlphabet, maxMemory, fourthWriter, thirdReader, std::get<1>(prep));
 	fourthWriter.close();
 	thirdReader.close();
 
@@ -1139,7 +1139,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 5");
 
-	step5InFile<IndexType>(fourthFile, fifthFile, std::get<1>(prep), std::get<0>(fourthRet), std::get<1>(fourthRet));
+	step5InFile<IndexType>(fourthFile, fifthFile, maxMemory, std::get<1>(prep), std::get<0>(fourthRet), std::get<1>(fourthRet));
 
 	std::ofstream SAinverseWriter(SAinverseFile, std::ios::binary);
 	std::ifstream fifthReader(fifthFile, std::ios::binary);
@@ -1178,9 +1178,9 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 7");
 
-	WeirdPriorityQueue<Alphabet, IndexType> result(sourceLen, 25000000);
+	WeirdPriorityQueue<Alphabet, IndexType> result(sourceLen, maxMemory/2);
 
-	step2or7LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, 25000000, seventhWriter, sixthReader, std::get<1>(prep), &result, charSum, std::get<0>(prep));
+	step2or7LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, maxMemory/2, seventhWriter, sixthReader, std::get<1>(prep), &result, charSum, std::get<0>(prep));
 	seventhWriter.close();
 	sixthReader.close();
 
@@ -1189,7 +1189,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	cerrMemoryUsage("before step 8");
 
 	std::ofstream dummyStream;
-	step3or8LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, 25000000, dummyStream, seventhReader, std::get<1>(prep), &result, charSum, std::get<0>(prep));
+	step3or8LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, maxMemory/2, dummyStream, seventhReader, std::get<1>(prep), &result, charSum, std::get<0>(prep));
 	seventhReader.close();
 
 	std::ofstream resultWriter(destFile, std::ios::binary);
@@ -1216,31 +1216,31 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 }
 
 template <class Alphabet>
-void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlphabet, const std::string& destFile, bool addSentinel)
+void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlphabet, size_t maxMemory, const std::string& destFile, bool addSentinel)
 {
 	if (sourceLen < 255)
 	{
-		bwtInFiles<Alphabet, unsigned char>(sourceFile, sourceLen, maxAlphabet, destFile, addSentinel);
+		bwtInFiles<Alphabet, unsigned char>(sourceFile, sourceLen, maxAlphabet, maxMemory, destFile, addSentinel);
 	}
 	else if (sourceLen < std::numeric_limits<uint16_t>::max())
 	{
-		bwtInFiles<Alphabet, uint16_t>(sourceFile, sourceLen, maxAlphabet, destFile, addSentinel);
+		bwtInFiles<Alphabet, uint16_t>(sourceFile, sourceLen, maxAlphabet, maxMemory, destFile, addSentinel);
 	}
 	else if (sourceLen < std::numeric_limits<uint32_t>::max())
 	{
-		bwtInFiles<Alphabet, uint32_t>(sourceFile, sourceLen, maxAlphabet, destFile, addSentinel);
+		bwtInFiles<Alphabet, uint32_t>(sourceFile, sourceLen, maxAlphabet, maxMemory, destFile, addSentinel);
 	}
 	else
 	{
-		bwtInFiles<Alphabet, size_t>(sourceFile, sourceLen, maxAlphabet, destFile, addSentinel);
+		bwtInFiles<Alphabet, size_t>(sourceFile, sourceLen, maxAlphabet, maxMemory, destFile, addSentinel);
 	}
 }
 
 template <class Alphabet>
-void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, const std::string& destFile)
+void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, size_t maxMemory, const std::string& destFile)
 {
 	size_t sourceLen = getFileLengthInAlphabets<Alphabet>(sourceFile)+1;
-	bwtInFiles<Alphabet>(sourceFile, sourceLen, maxAlphabet, destFile, true);
+	bwtInFiles<Alphabet>(sourceFile, sourceLen, maxAlphabet, maxMemory, destFile, true);
 }
 
 extern void bwt(const char* source, size_t sourceLen, char* dest);

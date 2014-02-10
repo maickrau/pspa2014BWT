@@ -315,7 +315,7 @@ void testInFileBWT(const std::string& fileName)
 	bwt(raw.data(), raw.size(), 255, result.data());
 	freeMemory(raw);
 	std::string resultFile = getTempFileName();
-	bwtInFiles<unsigned char>(fileName, 255, resultFile);
+	bwtInFiles<unsigned char>(fileName, 255, 1000000, resultFile);
 	std::vector<unsigned char> comp = readVectorFromFile<unsigned char>(resultFile, false);
 	if (comp.size() != result.size())
 	{
@@ -373,7 +373,8 @@ int main(int argc, char** argv)
 	int gotOption;
 	std::string inFile;
 	std::string outFile;
-	while ((gotOption = getopt(argc, argv, "tmfhui:o:")) != -1)
+	size_t maxMemory = 100000000;
+	while ((gotOption = getopt(argc, argv, "tmfhuM:i:o:")) != -1)
 	{
 		switch(gotOption)
 		{
@@ -382,6 +383,9 @@ int main(int argc, char** argv)
 				break;
 			case 'm':
 				mode = IN_MEMORY;
+				break;
+			case 'M':
+				maxMemory = strtoul(optarg, NULL, 10);
 				break;
 			case 'f':
 				mode = IN_FILE;
@@ -418,8 +422,8 @@ int main(int argc, char** argv)
 			bwtFromFileInMemory(inFile, outFile);
 			break;
 		case IN_FILE:
-			std::cerr << "Running in-file BWT from file " << inFile << " to " << outFile << "\n";
-			bwtInFiles<unsigned char>(inFile, 255, outFile);
+			std::cerr << "Running in-file BWT from file " << inFile << " to " << outFile << " using " << maxMemory << " bytes of extra memory\n";
+			bwtInFiles<unsigned char>(inFile, 255, maxMemory, outFile);
 			break;
 		case INVERSE:
 			std::cerr << "Running inverse BWT from file " << inFile << " to " << outFile << "\n";
