@@ -305,8 +305,6 @@ void doTests()
 	testReversibilityWithLotsOfRandoms(10, 5000);
 	testReversibilityWithLotsOfRandoms(1, 100000);
 
-	testReversibilityWithFile("minigenome");
-	testReversibilityWithFile("genome3");
 }
 
 void testInFileBWT(const std::string& fileName)
@@ -336,6 +334,8 @@ void testInFileBWT(const std::string& fileName)
 
 void doInFileTests()
 {
+	testReversibilityWithFile("minigenome");
+	testReversibilityWithFile("genome3");
 	testInFileBWT("minigenome");
 }
 
