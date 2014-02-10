@@ -401,7 +401,6 @@ void step2or7LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlp
 		assert(result != nullptr);
 	}
 	std::vector<size_t> numbersArrayed(maxAlphabet+1, 0);
-	std::vector<size_t> numbersOutputted(maxAlphabet+1, 0);
 	WeirdPriorityQueue<IndexType, IndexType> priorities(textLen, k);
 	for (size_t i = 0; i < LMSLeftSize; i++)
 	{
@@ -438,10 +437,7 @@ void step2or7LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlp
 				{
 					writeIndex = textLen-1;
 				}
-				assert(charSum[text[jminus1]]+numbersOutputted[text[jminus1]] < textLen);
-				assert(numbersOutputted[text[jminus1]] < charSum[text[jminus1]+1]-charSum[text[jminus1]]);
-				result->insert(text[writeIndex], charSum[text[jminus1]]+numbersOutputted[text[jminus1]]);
-				numbersOutputted[text[jminus1]]++;
+				result->insert(text[writeIndex], pos);
 			}
 		}
 		else
@@ -530,7 +526,6 @@ void step3or8LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlp
 	}
 	WeirdPriorityQueue<IndexType, IndexType> priorities(textLen, k);
 	std::vector<IndexType> numbersArrayed(maxAlphabet+1, 0);
-	std::vector<IndexType> numbersOutputted(maxAlphabet+1);
 	for (size_t i = 0; i < LMSRightSize; i++)
 	{
 		IndexType index;
@@ -566,12 +561,7 @@ void step3or8LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlp
 				{
 					writeIndex = textLen-1;
 				}
-				assert(numbersOutputted[text[jminus1]] < charSum[text[jminus1]+1]);
-				assert(numbersOutputted[text[jminus1]]+1 <= charSum[text[jminus1]+1]);
-				assert(numbersOutputted[text[jminus1]]+charSum[text[jminus1]] < charSum[text[jminus1]+1]);
-				assert(charSum[text[jminus1]+1]-numbersOutputted[text[jminus1]]-1 < textLen);
-				result->insert(text[writeIndex], charSum[text[jminus1]+1]-numbersOutputted[text[jminus1]]-1);
-				numbersOutputted[text[jminus1]]++;
+				result->insert(text[writeIndex], reversePos);
 			}
 		}
 		else
