@@ -394,7 +394,7 @@ void step2or7(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 
 //sorts (with step 3) the LMS-type substrings
 template <class Alphabet, class IndexType, bool isStep7>
-void step2or7LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlphabet, size_t k, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize, Alphabet* const result, const std::vector<IndexType>& charSum, const std::vector<IndexType>& Lsum)
+void step2or7LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlphabet, size_t k, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize, WeirdPriorityQueue<Alphabet, IndexType>* result, const std::vector<IndexType>& charSum, const std::vector<IndexType>& Lsum)
 {
 	if (isStep7)
 	{
@@ -440,7 +440,7 @@ void step2or7LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlp
 				}
 				assert(charSum[text[jminus1]]+numbersOutputted[text[jminus1]] < textLen);
 				assert(numbersOutputted[text[jminus1]] < charSum[text[jminus1]+1]-charSum[text[jminus1]]);
-				result[charSum[text[jminus1]]+numbersOutputted[text[jminus1]]] = text[writeIndex];
+				result->insert(text[writeIndex], charSum[text[jminus1]]+numbersOutputted[text[jminus1]]);
 				numbersOutputted[text[jminus1]]++;
 			}
 		}
@@ -522,7 +522,7 @@ void step3or8(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 
 //sorts (with step 2) the LMS-type substrings
 template <class Alphabet, class IndexType, bool isStep8>
-void step3or8LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlphabet, size_t k, std::ostream& out, std::istream& LMSRight, size_t LMSRightSize, Alphabet* const result, const std::vector<IndexType>& charSum, const std::vector<IndexType>& Lsum)
+void step3or8LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlphabet, size_t k, std::ostream& out, std::istream& LMSRight, size_t LMSRightSize, WeirdPriorityQueue<Alphabet, IndexType>* result, const std::vector<IndexType>& charSum, const std::vector<IndexType>& Lsum)
 {
 	if (isStep8)
 	{
@@ -570,7 +570,7 @@ void step3or8LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlp
 				assert(numbersOutputted[text[jminus1]]+1 <= charSum[text[jminus1]+1]);
 				assert(numbersOutputted[text[jminus1]]+charSum[text[jminus1]] < charSum[text[jminus1]+1]);
 				assert(charSum[text[jminus1]+1]-numbersOutputted[text[jminus1]]-1 < textLen);
-				result[charSum[text[jminus1]+1]-numbersOutputted[text[jminus1]]-1] = text[writeIndex];
+				result->insert(text[writeIndex], charSum[text[jminus1]+1]-numbersOutputted[text[jminus1]]-1);
 				numbersOutputted[text[jminus1]]++;
 			}
 		}
@@ -1105,7 +1105,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 2");
 
-	step2or7LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, 10000000, secondWriter, LMSLeftReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	step2or7LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, 10000000, secondWriter, LMSLeftReader, std::get<1>(prep), (WeirdPriorityQueue<Alphabet, IndexType>*)nullptr, charSum, std::get<0>(prep));
 	secondWriter.close();
 	LMSLeftReader.close();
 
@@ -1114,7 +1114,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 3");
 
-	step3or8LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, 10000000, thirdWriter, secondReader, std::get<1>(prep), (Alphabet*)nullptr, charSum, std::get<0>(prep));
+	step3or8LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, 10000000, thirdWriter, secondReader, std::get<1>(prep), (WeirdPriorityQueue<Alphabet, IndexType>*)nullptr, charSum, std::get<0>(prep));
 	thirdWriter.close();
 	secondReader.close();
 
@@ -1173,14 +1173,14 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	freeMemory(sixth);
 #endif
 
-	std::vector<Alphabet> dest(sourceLen, 0);
-
 	std::ofstream seventhWriter(seventhFile, std::ios::binary);
 	std::ifstream sixthReader(sixthFile, std::ios::binary);
 
 	cerrMemoryUsage("before step 7");
 
-	step2or7LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, 10000000, seventhWriter, sixthReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
+	WeirdPriorityQueue<Alphabet, IndexType> result(sourceLen, 10000000);
+
+	step2or7LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, 10000000, seventhWriter, sixthReader, std::get<1>(prep), &result, charSum, std::get<0>(prep));
 	seventhWriter.close();
 	sixthReader.close();
 
@@ -1189,10 +1189,16 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	cerrMemoryUsage("before step 8");
 
 	std::ofstream dummyStream;
-	step3or8LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, 10000000, dummyStream, seventhReader, std::get<1>(prep), dest.data(), charSum, std::get<0>(prep));
+	step3or8LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, 10000000, dummyStream, seventhReader, std::get<1>(prep), &result, charSum, std::get<0>(prep));
 	seventhReader.close();
 
-	writeVectorToFile(dest, destFile);
+	std::ofstream resultWriter(destFile, std::ios::binary);
+	while (!result.empty())
+	{
+		Alphabet alph = result.get();
+		resultWriter.write((char*)&alph, sizeof(Alphabet));
+	}
+	resultWriter.close();
 
 	remove(LMSLeftFile.c_str());
 	remove(charSumFile.c_str());
