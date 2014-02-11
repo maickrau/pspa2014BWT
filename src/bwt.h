@@ -729,6 +729,91 @@ bool LMSSubstringsAreEqual(const Alphabet* text, size_t textLen, size_t str1, si
 	assert(false);
 }
 
+//Doesn't need information about LMS substring borders to test substring equality. May read values outside the substring, however will not read past the next substring
+template <class Alphabet>
+bool LMSSubstringsAreEqualNoBorder(const Alphabet* text, size_t textLen, size_t str1, size_t str2)
+{
+	if (text[str1] != text[str2])
+	{
+		return false;
+	}
+	str1++;
+	str2++;
+	size_t pos = 1;
+	size_t numEquals = 0;
+	size_t lastPossibleBorderStr1 = 0;
+	size_t lastPossibleBorderStr2 = 0;
+	bool borderFoundStr1 = false;
+	bool borderFoundStr2 = false;
+	bool stillEqual = true;
+	while (true)
+	{
+		if (stillEqual)
+		{
+			if (text[str1] != text[str2])
+			{
+				stillEqual = false;
+				if (lastPossibleBorderStr1 == 0 || lastPossibleBorderStr2 == 0)
+				{
+					return false;
+				}
+			}
+			else
+			{
+				numEquals++;
+			}
+		}
+		if (!borderFoundStr1 && text[str1] < text[str1-1])
+		{
+			lastPossibleBorderStr1 = pos;
+			if (str1 == textLen-1)
+			{
+				borderFoundStr1 = true;
+			}
+		}
+		if (!borderFoundStr2 && text[str2] < text[str2-1])
+		{
+			lastPossibleBorderStr2 = pos;
+			if (str2 == textLen-1)
+			{
+				borderFoundStr2 = true;
+			}
+		}
+		if (text[str1] > text[str1-1] && lastPossibleBorderStr1 != 0)
+		{
+			borderFoundStr1 = true;
+		}
+		if (text[str2] > text[str2-1] && lastPossibleBorderStr2 != 0)
+		{
+			borderFoundStr2 = true;
+		}
+		if (borderFoundStr1 && numEquals < lastPossibleBorderStr1)
+		{
+			return false;
+		}
+		if (borderFoundStr2 && numEquals < lastPossibleBorderStr2)
+		{
+			return false;
+		}
+		if (borderFoundStr2 && borderFoundStr1)
+		{
+			if (lastPossibleBorderStr2 != lastPossibleBorderStr1)
+			{
+				return false;
+			}
+			if (numEquals < lastPossibleBorderStr2)
+			{
+				return false;
+			}
+			return true;
+		}
+		str1++;
+		str2++;
+		pos++;
+	}
+	assert(false);
+}
+
 //used only in debugging to check that the LMS-substrings are ordered correctly
 template <class Alphabet>
 int compareLMSSubstrings(const Alphabet* text, size_t textLen, size_t str1, size_t str2, const std::vector<bool>& LMSSubstringBorder, const std::vector<bool>& isSType)
@@ -866,17 +951,6 @@ std::tuple<bool, size_t> step4LowMemory(const Alphabet* text, size_t textLen, si
 	std::tuple<bool, size_t> ret;
 	std::get<0>(ret) = true;
 	std::get<1>(ret) = 0;
-	std::vector<bool> LMSSubstringBorder(textLen, false);
-	for (size_t i = 0; i < LMSLeftSize; i++)
-	{
-		IndexType index;
-		assert(LMSLeft.good());
-		LMSLeft.read((char*)&index, sizeof(IndexType));
-		LMSSubstringBorder[index] = true;
-	}
-	LMSLeft.clear();
-	LMSLeft.seekg(0);
-	assert(LMSLeft.good());
 	WeirdPriorityQueue<IndexType, IndexType> sparseSPrime((textLen+1)/2, k);
 	IndexType currentName = LMSLeftSize+1;
 	IndexType oldIndex = 0;
@@ -885,7 +959,7 @@ std::tuple<bool, size_t> step4LowMemory(const Alphabet* text, size_t textLen, si
 	{
 		assert(LMSLeft.good());
 		LMSLeft.read((char*)&index, sizeof(IndexType));
-		if (i == 0 || !LMSSubstringsAreEqual(text, textLen, oldIndex, index, LMSSubstringBorder))
+		if (i == 0 || !LMSSubstringsAreEqualNoBorder(text, textLen, oldIndex, index))
 		{
 			currentName--;
 		}
