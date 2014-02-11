@@ -98,6 +98,8 @@ protected:
 template <class ItemType, class PriorityType>
 class WeirdPriorityQueue
 {
+private:
+	struct WriteType { ItemType item; PriorityType priority; };
 public:
 	WeirdPriorityQueue(size_t maxPriority, size_t maxBytes) :
 		numItems(0),
@@ -152,20 +154,17 @@ public:
 			streams[fileN]->seekg(0, std::ios::beg);
 			while (true)
 			{
-				ItemType item;
-				PriorityType priority;
+				WriteType read;
 				assert(streams[fileN]->good());
-				streams[fileN]->read((char*)&item, sizeof(ItemType));
+				streams[fileN]->read((char*)&read, sizeof(WriteType));
 				if (streams[fileN]->eof())
 				{
 					break;
 				}
-				assert(streams[fileN]->good());
-				streams[fileN]->read((char*)&priority, sizeof(PriorityType));
-				assert(priority >= currentStart);
-				assert(priority < currentEnd);
-				currentItems[priority-currentStart] = item;
-				used[priority-currentStart] = true;
+				assert(read.priority >= currentStart);
+				assert(read.priority < currentEnd);
+				currentItems[read.priority-currentStart] = read.item;
+				used[read.priority-currentStart] = true;
 			}
 		}
 		while (!used[currentPos])
@@ -192,12 +191,13 @@ public:
 			used[priority-currentStart] = true;
 			return;
 		}
+		WriteType write;
+		write.item = item;
+		write.priority = priority;
 		size_t fileN = priority/k;
 		assert(fileN < streams.size());
 		assert(streams[fileN]->good());
-		streams[fileN]->write((char*)&item, sizeof(ItemType));
-		assert(streams[fileN]->good());
-		streams[fileN]->write((char*)&priority, sizeof(PriorityType));
+		streams[fileN]->write((char*)&write, sizeof(WriteType));
 	};
 	size_t size() { return numItems; };
 	bool empty() { return numItems == 0; };
@@ -330,6 +330,128 @@ preprocess(std::istream& text, size_t textLen, size_t maxAlphabet, std::ostream&
 		LMSLeftOut.write((char*)buckets[i].data(), buckets[i].size()*sizeof(IndexType));
 		freeMemory(buckets[i]);
 	}
+
+	return ret;
+}
+
+template <class Alphabet, class IndexType>
+std::tuple<std::vector<IndexType>, //L-counts
+           std::vector<IndexType>, //charSum
+           size_t               //count of LMS-type indices
+#ifndef NDEBUG
+           ,std::vector<bool> //is S-type
+#endif
+           > 
+preprocessLowMemory(std::istream& text, size_t textLen, size_t maxAlphabet, size_t k, std::ostream& LMSLeftOut, std::ostream& LMSIndicesOut, bool addSentinel)
+{
+	std::tuple<std::vector<IndexType>, 
+	           std::vector<IndexType>,
+	           size_t
+#ifndef NDEBUG
+	           ,std::vector<bool>
+#endif
+	           > ret;
+	std::get<0>(ret).resize(maxAlphabet+1, 0);
+	std::get<1>(ret).resize(maxAlphabet+2, 0);
+	std::get<2>(ret) = 0;
+#ifndef NDEBUG
+	std::get<3>(ret).resize(textLen, false);
+#endif
+	std::vector<IndexType> sums(maxAlphabet+1, 0);
+	for (size_t i = 0; i < textLen-1; i++)
+	{
+		Alphabet symbol;
+		text.read((char*)&symbol, sizeof(Alphabet));
+		sums[symbol]++;
+	}
+	if (addSentinel)
+	{
+		sums[0]++;
+	}
+	else
+	{
+		Alphabet symbol;
+		text.read((char*)&symbol, sizeof(Alphabet));
+		sums[symbol]++;
+	}
+	for (size_t i = 1; i < maxAlphabet+2; i++)
+	{
+		std::get<1>(ret)[i] = std::get<1>(ret)[i-1]+sums[i-1];
+	}
+	freeMemory(sums);
+	text.clear();
+	text.seekg(0, std::ios::beg);
+	assert(text.good());
+	WeirdPriorityQueue<IndexType, IndexType> LMSLeft(textLen, k);
+	std::vector<IndexType> indicesWritten(maxAlphabet+1, 0);
+	IndexType lastPossibleLMS = 0;
+	IndexType lastCharacterBoundary = 0;
+	bool lastWasLType = false;
+	Alphabet currentSymbol;
+	Alphabet nextSymbol;
+	text.read((char*)&nextSymbol, sizeof(Alphabet));
+	for (size_t i = 0; i < textLen-1; i++)
+	{
+		currentSymbol = nextSymbol;
+		if (addSentinel && i == textLen-2)
+		{
+			nextSymbol = 0;
+		}
+		else
+		{
+			text.read((char*)&nextSymbol, sizeof(Alphabet));
+		}
+		assert(currentSymbol <= maxAlphabet);
+		if (currentSymbol > nextSymbol)
+		{
+			//L-type, and all in [lastCharacterBoundary, i] are L-type of the same letter
+			assert(i >= lastCharacterBoundary);
+			std::get<0>(ret)[currentSymbol] += (i-lastCharacterBoundary)+1;
+			lastPossibleLMS = i+1;
+			lastCharacterBoundary = i+1;
+			lastWasLType = true;
+		}
+		else if (currentSymbol < nextSymbol)
+		{
+			//S-type, and all in [lastCharacterBoundary, i] are S-type of the same letter
+#ifndef NDEBUG
+			for (size_t a = lastCharacterBoundary; a <= i; a++)
+			{
+				std::get<3>(ret)[a] = true;
+			}
+#endif
+			if (lastWasLType)
+			{
+				LMSLeft.insert(lastPossibleLMS, std::get<1>(ret)[currentSymbol]+indicesWritten[currentSymbol]);
+				indicesWritten[currentSymbol]++;
+				LMSIndicesOut.write((char*)&lastPossibleLMS, sizeof(IndexType));
+				assert(std::get<2>(ret) < textLen/2);
+				std::get<2>(ret)++;
+			}
+			lastWasLType = false;
+			lastCharacterBoundary = i+1;
+		}
+		else
+		{
+			assert(currentSymbol == nextSymbol);
+		}
+	}
+#ifndef NDEBUG
+	std::get<3>(ret)[textLen-1] = true;
+#endif
+	LMSLeft.insert(textLen-1, std::get<1>(ret)[nextSymbol]+indicesWritten[nextSymbol]);
+	IndexType lastIndex = textLen-1;
+	LMSIndicesOut.write((char*)&lastIndex, sizeof(IndexType));
+	assert(std::get<2>(ret) < textLen/2);
+	std::get<2>(ret)++;
+
+	assert(maxAlphabet+1 < std::numeric_limits<int>::max());
+	while (!LMSLeft.empty())
+	{
+		IndexType index = LMSLeft.get();
+		LMSLeftOut.write((char*)&index, sizeof(IndexType));
+	}
+
 	return ret;
 }
 
@@ -400,7 +522,7 @@ void step2or7LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlp
 	{
 		assert(result != nullptr);
 	}
-	std::vector<size_t> numbersArrayed(maxAlphabet+1, 0);
+	std::vector<IndexType> numbersArrayed(maxAlphabet+1, 0);
 	WeirdPriorityQueue<IndexType, IndexType> priorities(textLen, k);
 	for (size_t i = 0; i < LMSLeftSize; i++)
 	{
@@ -1072,21 +1194,18 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	std::string seventhFile = getTempFileName();
 
 	std::ofstream LMSLeftWriter(LMSLeftFile, std::ios::binary);
-	std::ofstream charSumWriter(charSumFile, std::ios::binary);
 	std::ofstream LMSIndicesWriter(LMSIndicesFile, std::ios::binary);
 	std::ifstream sourceReader(sourceFile, std::ios::binary);
 
 	cerrMemoryUsage("before preprocessing");
 
-	auto prep = preprocess<Alphabet, IndexType>(sourceReader, sourceLen, maxAlphabet, LMSLeftWriter, charSumWriter, LMSIndicesWriter, addSentinel);
+	auto prep = preprocessLowMemory<Alphabet, IndexType>(sourceReader, sourceLen, maxAlphabet, maxMemory, LMSLeftWriter, LMSIndicesWriter, addSentinel);
 	LMSLeftWriter.close();
-	charSumWriter.close();
 	LMSIndicesWriter.close();
 	sourceReader.close();
 
-	assert(std::get<1>(prep) <= sourceLen/2);
+	assert(std::get<2>(prep) <= sourceLen/2);
 
-	std::vector<IndexType> charSum = readVectorFromFile<IndexType>(charSumFile, false);
 	std::vector<Alphabet> source;
 	source = readVectorFromFile<Alphabet>(sourceFile, addSentinel);
 
@@ -1095,7 +1214,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 2");
 
-	step2or7LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, maxMemory, secondWriter, LMSLeftReader, std::get<1>(prep), (WeirdPriorityQueue<Alphabet, IndexType>*)nullptr, charSum, std::get<0>(prep));
+	step2or7LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, maxMemory, secondWriter, LMSLeftReader, std::get<2>(prep), (WeirdPriorityQueue<Alphabet, IndexType>*)nullptr, std::get<1>(prep), std::get<0>(prep));
 	secondWriter.close();
 	LMSLeftReader.close();
 
@@ -1104,7 +1223,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 3");
 
-	step3or8LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, maxMemory, thirdWriter, secondReader, std::get<1>(prep), (WeirdPriorityQueue<Alphabet, IndexType>*)nullptr, charSum, std::get<0>(prep));
+	step3or8LowMemory<Alphabet, IndexType, false>(source.data(), sourceLen, maxAlphabet, maxMemory, thirdWriter, secondReader, std::get<2>(prep), (WeirdPriorityQueue<Alphabet, IndexType>*)nullptr, std::get<1>(prep), std::get<0>(prep));
 	thirdWriter.close();
 	secondReader.close();
 
@@ -1112,7 +1231,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	cerrMemoryUsage("before LMS substring order verification");
 
 	std::vector<IndexType> third = readVectorFromFile<IndexType>(thirdFile, false);
-	verifyLMSSubstringsAreSorted(source.data(), sourceLen, third, std::get<2>(prep));
+	verifyLMSSubstringsAreSorted(source.data(), sourceLen, third, std::get<3>(prep));
 	freeMemory(third);
 #endif
 
@@ -1121,22 +1240,26 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 4");
 
-	auto fourthRet = step4LowMemory<Alphabet, IndexType>(source.data(), sourceLen, maxAlphabet, maxMemory, fourthWriter, thirdReader, std::get<1>(prep));
+	auto fourthRet = step4LowMemory<Alphabet, IndexType>(source.data(), sourceLen, maxAlphabet, maxMemory, fourthWriter, thirdReader, std::get<2>(prep));
 	fourthWriter.close();
 	thirdReader.close();
 
 	freeMemory(source);
+	writeVectorToFile(std::get<1>(prep), charSumFile);
+	freeMemory(std::get<1>(prep));
+	writeVectorToFile(std::get<0>(prep), LCountFile);
+	freeMemory(std::get<0>(prep));
 
 	cerrMemoryUsage("before step 5");
 
-	step5InFile<IndexType>(fourthFile, fifthFile, maxMemory, std::get<1>(prep), std::get<0>(fourthRet), std::get<1>(fourthRet));
+	step5InFile<IndexType>(fourthFile, fifthFile, maxMemory, std::get<2>(prep), std::get<0>(fourthRet), std::get<1>(fourthRet));
 
 	std::ofstream SAinverseWriter(SAinverseFile, std::ios::binary);
 	std::ifstream fifthReader(fifthFile, std::ios::binary);
 
 	cerrMemoryUsage("before step 6a");
 
-	alternateStep6a<IndexType>(SAinverseWriter, fifthReader, std::get<1>(prep));
+	alternateStep6a<IndexType>(SAinverseWriter, fifthReader, std::get<2>(prep));
 	SAinverseWriter.close();
 	fifthReader.close();
 
@@ -1145,7 +1268,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	cerrMemoryUsage("before step 6b");
 
-	auto sixth = alternateStep6b<Alphabet, IndexType>(SAinverseReader, LMSIndicesReader, std::get<1>(prep));
+	auto sixth = alternateStep6b<Alphabet, IndexType>(SAinverseReader, LMSIndicesReader, std::get<2>(prep));
 	SAinverseReader.close();
 	LMSIndicesReader.close();
 
@@ -1163,6 +1286,9 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	freeMemory(sixth);
 #endif
 
+	std::get<0>(prep) = readVectorFromFile<IndexType>(LCountFile, false);
+	std::get<1>(prep) = readVectorFromFile<IndexType>(charSumFile, false);
+
 	std::ofstream seventhWriter(seventhFile, std::ios::binary);
 	std::ifstream sixthReader(sixthFile, std::ios::binary);
 
@@ -1170,7 +1296,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 
 	WeirdPriorityQueue<Alphabet, IndexType> result(sourceLen, maxMemory/2);
 
-	step2or7LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, maxMemory/2, seventhWriter, sixthReader, std::get<1>(prep), &result, charSum, std::get<0>(prep));
+	step2or7LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, maxMemory/2, seventhWriter, sixthReader, std::get<2>(prep), &result, std::get<1>(prep), std::get<0>(prep));
 	seventhWriter.close();
 	sixthReader.close();
 
@@ -1179,7 +1305,7 @@ void bwtInFiles(const std::string& sourceFile, size_t sourceLen, size_t maxAlpha
 	cerrMemoryUsage("before step 8");
 
 	std::ofstream dummyStream;
-	step3or8LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, maxMemory/2, dummyStream, seventhReader, std::get<1>(prep), &result, charSum, std::get<0>(prep));
+	step3or8LowMemory<Alphabet, IndexType, true>(source.data(), sourceLen, maxAlphabet, maxMemory/2, dummyStream, seventhReader, std::get<2>(prep), &result, std::get<1>(prep), std::get<0>(prep));
 	seventhReader.close();
 
 	std::ofstream resultWriter(destFile, std::ios::binary);
