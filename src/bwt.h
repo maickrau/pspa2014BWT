@@ -709,8 +709,6 @@ bool LMSSubstringsAreEqual(const Alphabet* text, size_t textLen, size_t str1, si
 	}
 	str1++;
 	str2++;
-	str1 %= textLen;
-	str2 %= textLen;
 	while (true)
 	{
 		if (text[str1] != text[str2])
@@ -727,8 +725,6 @@ bool LMSSubstringsAreEqual(const Alphabet* text, size_t textLen, size_t str1, si
 		}
 		str1++;
 		str2++;
-		str1 %= textLen;
-		str2 %= textLen;
 	}
 	assert(false);
 }
