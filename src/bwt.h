@@ -10,6 +10,8 @@
 #include <iostream>
 #include <streambuf>
 #include <fstream>
+#include <tuple>
+#include <algorithm>
 
 //----------
 //use these

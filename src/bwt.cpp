@@ -1,6 +1,3 @@
-#include <cassert>
-#include <algorithm>
-
 #include "bwt.h"
 
 #ifdef PRINTRSS
