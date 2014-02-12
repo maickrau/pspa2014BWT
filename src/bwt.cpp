@@ -57,3 +57,13 @@ void inverseBWT(const char* source, size_t sourceLen, char* dest)
 {
 	inverseBWT<unsigned char>((const unsigned char*)source, sourceLen, 255, (unsigned char*)dest);
 }
+
+void bwtInFiles(const char* sourceFile, size_t maxMemory, const char* destFile)
+{
+	bwtInFiles<unsigned char>(sourceFile, 255, maxMemory, destFile);
+}
+
+void bwtInFiles(const std::string& sourceFile, size_t maxMemory, const std::string& destFile)
+{
+	bwtInFiles<unsigned char>(sourceFile, 255, maxMemory, destFile);
+}

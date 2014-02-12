@@ -15,6 +15,8 @@
 //use these
 void bwt(const char* source, size_t sourceLen, char* dest);
 void inverseBWT(const char* source, size_t sourceLen, char* dest);
+void bwtInFiles(const char* sourceFile, size_t maxMemory, const char* destFile);
+void bwtInFiles(const std::string& sourceFile, size_t maxMemory, const std::string& destFile);
 //----------
 
 

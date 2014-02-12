@@ -424,7 +424,7 @@ int main(int argc, char** argv)
 			break;
 		case IN_FILE:
 			std::cerr << "Running in-file BWT from file " << inFile << " to " << outFile << " using " << maxMemory << " bytes of extra memory\n";
-			bwtInFiles<unsigned char>(inFile, 255, maxMemory, outFile);
+			bwtInFiles(inFile, maxMemory, outFile);
 			break;
 		case INVERSE:
 			std::cerr << "Running inverse BWT from file " << inFile << " to " << outFile << "\n";
