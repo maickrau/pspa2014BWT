@@ -18,9 +18,6 @@ Compiling:
 CS department computers (gcc 4.6.4):
 g++ src/bwt.cpp src/main.cpp -std=c++0x -O3 -o bwt -DNDEBUG
 
-mingw on windows:
-g++ src/bwt.cpp src/main.cpp -std=c++11 -Wall -static -static-libgcc -static-libstdc++ -O3 -o bwt -DNDEBUG
-
 ubuntu 13.10 with gcc 4.8.1:
 g++ src/bwt.cpp src/main.cpp -std=c++11 -Wall -O3 -o bwt -DNDEBUG
 
