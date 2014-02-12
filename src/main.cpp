@@ -358,12 +358,13 @@ void inverseBwtFromFileInMemory(const std::string& inFile, const std::string& ou
 void printHelp()
 {
 	std::cerr << "Usage:\n";
-	std::cerr << "\tbwt [MODE] -i in_file_name -o out_file_name\n\n";
+	std::cerr << "\tbwt [MODE] -M max_bytes -i in_file_name -o out_file_name\n\n";
 	std::cerr << "Modes:\n";
 	std::cerr << "\t-t run tests\n";
 	std::cerr << "\t-m in-memory BWT\n";
 	std::cerr << "\t-f in-files BWT\n";
 	std::cerr << "\t-u inverse BWT\n";
+	std::cerr << "\t-M max_bytes use max_bytes extra memory (optional, only for in-files mode)\n";
 }
 
 int main(int argc, char** argv)
