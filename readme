@@ -1,14 +1,47 @@
-BWT implementation based on http://link.springer.com/chapter/10.1007%2F978-3-319-02432-5_5
+Semi-external BWT implementation based on http://link.springer.com/chapter/10.1007%2F978-3-319-02432-5_5
 
-creating the genome data:
--download hg19.2bit from http://genome.ucsc.edu/
--convert it to .fa format with twoBitToFa: ./twoBitToFa hg19.2bit hg19.fa
--remove all characters except A, T, C, G and N, and then pick first Gb: tr -cd 'ATCGN' < hg19.fa | head -c 1000000000 > genome1
+Differences between the implementation and the algorithm described in the paper:
+-Step 1 does more preprocessing than in the paper. The step constructs the A_lms array as in the paper, and also calculates how many times a specific character appears in the text, how many times a specific character appears as the first character of an L-type suffix, and a list of all LMS-type suffix indices in the order they appear in the text.
+-Steps 2 and 3 work like the paper describes
+-Step 4 does not construct either B or R arrays. S' and S are constructed like the paper describes.
+-Step 5 works like the paper describes
+-Step 6 is based on the suffix array construction algorithm described in the paper instead of the BWT algorithm, and is split into two parts. Step 6a calculates the inverse suffix array of BWT' and step 6b constructs the A_lms array based on the inverse suffix array and the list of LMS-suffixes calculated in step 1
+-Steps 7 and 8 work like the paper describes
 
-compiling:
+The program does not have the optimization described in the paper's "Practical Optimization for Very Small Alphabets" section. The program has the memory optimization described at the end of "Semi-external Construction of the Burrows-Wheeler Transform" section.
+
+Alphabets and sentinel character:
+The algorithm uses a constant alphabet whose size is determined at runtime when calling BWT. For the first call the algorithm uses unsigned chars as the alphabet. For recursive calls, the algorithm selects the alphabet from unsigned char, uint16_t, uint32_t and size_t, taking the smallest alphabet that can represent all the characters in the text. Pointers to the text similiarly select from those four types, taking the smallest that can represent any location in the text. The algorithm represents the sentinel character explicitly as a '\0' (null character, smallest unsigned char) which is added to the end of input data. The algorithm does not work if the input text already contains a '\0' somewhere.
+
+Compiling:
+
+CS department computers (gcc 4.6.4):
+g++ src/bwt.cpp src/main.cpp -std=c++0x -O3 -o bwt -DNDEBUG
 
 mingw on windows:
-g++ src/bwt.cpp src/main.cpp -std=c++11 -Wall -static -static-libgcc -static-libstdc++
+g++ src/bwt.cpp src/main.cpp -std=c++11 -Wall -static -static-libgcc -static-libstdc++ -O3 -o bwt -DNDEBUG
 
 ubuntu 13.10 with gcc 4.8.1:
-g++ src/bwt.cpp src/main.cpp -std=c++11 -Wall
+g++ src/bwt.cpp src/main.cpp -std=c++11 -Wall -O3 -o bwt -DNDEBUG
+
+Option -DNDEBUG can be removed to use assertions and correctness checks. This makes the program run slower and consume more memory.
+Option -DPRINTRSS can be added to make the program print maximum resident set size between each step of in-file BWT
+
+Running the program:
+The program has two modes for BWT, in-files and in-memory. In-files is the semi-external BWT that uses 1 byte of memory per 1 byte of input. For in-files mode, the program also uses a constant amount of extra memory which can be chosen by running with option -M [memory_in_bytes]. If the option is not given it uses by default 100 Mb of extra memory. In-memory mode keeps all data in memory, and uses a lot of memory but runs a bit faster. The program also has an inverse BWT, which also uses a lot of memory. The program also has tests mode. Tests need input data files which are hardcoded with names "genome3" and "minigenome", see section below on how to create them. The tests run in-memory BWT and then inverse BWT on the data and pass if inverting the transformed data results in the original data. The tests also run in-file BWT and compare it to the in-memory BWT, and pass if they are equal.
+Examples:
+run BWT in-files from file "big_genome" to "big_genome.out" using 500 Mb of extra memory:
+./bwt -f -M 500000000 -i big_genome -o big_genome.out
+run BWT in-memory from file "small_genome" to "small_genome.out":
+./bwt -m -i small_genome -o small_genome
+run tests:
+./bwt -t
+run inverse BWT from file "transformed" to "untransformed":
+./bwt -u -i transformed -o untransformed
+
+Creating the genome data:
+-Download human genome: wget http://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/hg19.2bit
+-Also download the twoBitToFa utility: wget http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/twoBitToFa
+-Convert the genome to .fa format: ./twoBitToFa hg19.2bit hg19.fa
+-genome3: remove all characters except A, T, C, G and N, and then pick the first 10 Mb: tr -cd 'ATCGN' < hg19.fa | head -c 10000000 > genome3
+-minigenome: same except the last Mb: tr -cd 'ATCGN' < hg19.fa | tail -c 1000000 > minigenome
