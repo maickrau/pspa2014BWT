@@ -5,7 +5,7 @@ Differences between the implementation and the algorithm described in the paper:
 -Steps 2 and 3 work like the paper describes
 -Step 4 does not construct either B or R arrays. S' and S are constructed like the paper describes.
 -Step 5 works like the paper describes
--Step 6 is based on the suffix array construction algorithm described in the paper instead of the BWT algorithm, and is split into two parts. Step 6a calculates the inverse suffix array of BWT' and step 6b constructs the A_lms array based on the inverse suffix array and the list of LMS-suffixes calculated in step 1
+-Step 6 is based on the suffix array construction algorithm described in the paper instead of the BWT algorithm, and is split into two parts. Step 6a calculates the inverse suffix array of S' from BWT' and step 6b constructs the A_lms array based on the inverse suffix array and the list of LMS-suffixes calculated in step 1
 -Steps 7 and 8 work like the paper describes
 
 The program does not have the optimization described in the paper's "Practical Optimization for Very Small Alphabets" section. The program has the memory optimization described at the end of "Semi-external Construction of the Burrows-Wheeler Transform" section.
