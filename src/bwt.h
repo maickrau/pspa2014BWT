@@ -11,6 +11,13 @@
 #include <streambuf>
 #include <fstream>
 
+//----------
+//use these
+void bwt(const char* source, size_t sourceLen, char* dest);
+void inverseBWT(const char* source, size_t sourceLen, char* dest);
+//----------
+
+
 void cerrMemoryUsage(const char* msg);
 
 template <class Alphabet, class IndexType>
@@ -72,12 +79,14 @@ size_t getFileLengthInAlphabets(const std::string& sourceFile)
 	return fileLen;
 }
 
+//vector.clear() doesn't guarantee that memory will be freed
 template <class O>
 void freeMemory(O& o)
 {
 	O().swap(o);
 }
 
+//used to write/read sequentially into memory without copying the memory (stringbuf copies memory)
 template <class Alphabet>
 class MemoryStreambuffer : public std::streambuf
 {
@@ -95,6 +104,7 @@ protected:
 	}
 };
 
+//memory usage reduction trick from the end of paper's section 5
 template <class ItemType, class PriorityType>
 class WeirdPriorityQueue
 {
@@ -358,6 +368,7 @@ preprocessLowMemory(std::istream& text, size_t textLen, size_t maxAlphabet, size
 	std::get<3>(ret).resize(textLen, false);
 #endif
 	std::vector<IndexType> sums(maxAlphabet+1, 0);
+	//two passes, first calculate how many times each symbol appears. This is necessary for calculating where each LMS index would go in the LMSleft array
 	for (size_t i = 0; i < textLen-1; i++)
 	{
 		Alphabet symbol;
@@ -455,6 +466,7 @@ preprocessLowMemory(std::istream& text, size_t textLen, size_t maxAlphabet, size
 	return ret;
 }
 
+//high memory alternative used for in-memory BWT
 //sorts (with step 3) the LMS-type substrings
 template <class Alphabet, class IndexType, bool isStep7>
 void step2or7(const Alphabet* const text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize, Alphabet* const result, const std::vector<IndexType>& charSum, const std::vector<IndexType>& Lsum)
@@ -514,6 +526,7 @@ void step2or7(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 	}
 }
 
+//low memory alternative used for in-file BWT
 //sorts (with step 3) the LMS-type substrings
 template <class Alphabet, class IndexType, bool isStep7>
 void step2or7LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlphabet, size_t k, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize, WeirdPriorityQueue<Alphabet, IndexType>* result, const std::vector<IndexType>& charSum, const std::vector<IndexType>& Lsum)
@@ -569,6 +582,7 @@ void step2or7LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlp
 	}
 }
 
+//high memory alternative for in-memory BWT
 //sorts (with step 2) the LMS-type substrings
 template <class Alphabet, class IndexType, bool isStep8>
 void step3or8(const Alphabet* const text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSRight, size_t LMSRightSize, Alphabet* const result, const std::vector<IndexType>& charSum, const std::vector<IndexType>& Lsum)
@@ -638,6 +652,7 @@ void step3or8(const Alphabet* const text, size_t textLen, size_t maxAlphabet, st
 	}
 }
 
+//low memory alternative for in-file BWT
 //sorts (with step 2) the LMS-type substrings
 template <class Alphabet, class IndexType, bool isStep8>
 void step3or8LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlphabet, size_t k, std::ostream& out, std::istream& LMSRight, size_t LMSRightSize, WeirdPriorityQueue<Alphabet, IndexType>* result, const std::vector<IndexType>& charSum, const std::vector<IndexType>& Lsum)
@@ -646,6 +661,7 @@ void step3or8LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlp
 	{
 		assert(result != nullptr);
 	}
+	//positions start with 0 as the rightmost element because the indices are processed right-to-left
 	WeirdPriorityQueue<IndexType, IndexType> priorities(textLen, k);
 	std::vector<IndexType> numbersArrayed(maxAlphabet+1, 0);
 	for (size_t i = 0; i < LMSRightSize; i++)
@@ -696,6 +712,7 @@ void step3or8LowMemory(const Alphabet* const text, size_t textLen, size_t maxAlp
 	}
 }
 
+//because this only checks equality, it doesn't need to know whether the suffixes are L-type or S-type
 template <class Alphabet>
 bool LMSSubstringsAreEqual(const Alphabet* text, size_t textLen, size_t str1, size_t str2, const std::vector<bool>& LMSSubstringBorder)
 {
@@ -729,6 +746,7 @@ bool LMSSubstringsAreEqual(const Alphabet* text, size_t textLen, size_t str1, si
 	assert(false);
 }
 
+//because this only checks equality, it doesn't need to know whether the suffixes are L-type or S-type
 //Doesn't need information about LMS substring borders to test substring equality. May read values outside the substring, however will not read past the next substring
 template <class Alphabet>
 bool LMSSubstringsAreEqualNoBorder(const Alphabet* text, size_t textLen, size_t str1, size_t str2)
@@ -814,7 +832,8 @@ bool LMSSubstringsAreEqualNoBorder(const Alphabet* text, size_t textLen, size_t 
 	assert(false);
 }
 
-//used only in debugging to check that the LMS-substrings are ordered correctly
+//used only in debugging to check that the LMS-substrings are ordered correctly by steps 1-3
+//needs to know whether a position is L-type or S-type because the substrings' ordering is important
 template <class Alphabet>
 int compareLMSSubstrings(const Alphabet* text, size_t textLen, size_t str1, size_t str2, const std::vector<bool>& LMSSubstringBorder, const std::vector<bool>& isSType)
 {
@@ -857,6 +876,7 @@ int compareLMSSubstrings(const Alphabet* text, size_t textLen, size_t str1, size
 	assert(false);
 }
 
+//used only in debugging to check that the LMS-suffixes are ordered correctly by steps 4-6
 template <class Alphabet>
 int compareLMSSuffixes(const Alphabet* text, size_t textLen, size_t str1, size_t str2)
 {
@@ -888,6 +908,7 @@ int compareLMSSuffixes(const Alphabet* text, size_t textLen, size_t str1, size_t
 	assert(false);
 }
 
+//high memory alternative used for in-memory BWT
 //returns whether the output can be directly BWT'd and the max alphabet
 template <class Alphabet, class IndexType>
 std::tuple<bool, size_t> step4(const Alphabet* text, size_t textLen, size_t maxAlphabet, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize)
@@ -945,12 +966,15 @@ std::tuple<bool, size_t> step4(const Alphabet* text, size_t textLen, size_t maxA
 	return ret;
 }
 
+//low memory alternative used for in-file BWT
+//returns whether the output can be directly BWT'd and the max alphabet
 template <class Alphabet, class IndexType>
 std::tuple<bool, size_t> step4LowMemory(const Alphabet* text, size_t textLen, size_t maxAlphabet, size_t k, std::ostream& out, std::istream& LMSLeft, size_t LMSLeftSize)
 {
 	std::tuple<bool, size_t> ret;
 	std::get<0>(ret) = true;
 	std::get<1>(ret) = 0;
+	//using an array for sparse S' would use |text|/2*sizeof(text_pointer) bytes, usually |text|*2 bytes
 	WeirdPriorityQueue<IndexType, IndexType> sparseSPrime((textLen+1)/2, k);
 	IndexType currentName = LMSLeftSize+1;
 	IndexType oldIndex = 0;
@@ -1038,6 +1062,7 @@ void step5InFile(const std::string& SprimeFile, const std::string& outFile, size
 	bwtInFiles<IndexType>(SprimeFile, SprimeSize, maxAlphabet, maxMemory, outFile, false);
 }
 
+//calculate the inverse suffix array of S' by using BWT'
 template <class IndexType>
 void alternateStep6a(std::ostream& SAinverse, std::istream& BWTprime, size_t BWTprimeSize)
 {
@@ -1084,6 +1109,7 @@ void alternateStep6a(std::ostream& SAinverse, std::istream& BWTprime, size_t BWT
 	}
 }
 
+//calculate the order of LMS-suffixes of S by using the inverse suffix array of S' and a list of all LMS indices from step 1
 template <class Alphabet, class IndexType>
 std::vector<IndexType> alternateStep6b(std::istream& SAinverse, std::istream& LMSIndices, size_t size)
 {
@@ -1099,6 +1125,7 @@ std::vector<IndexType> alternateStep6b(std::istream& SAinverse, std::istream& LM
 	return ret;
 }
 
+//only for debugging
 template <class Alphabet, class IndexType>
 void verifyLMSSubstringsAreSorted(const Alphabet* source, size_t sourceLen, const std::vector<IndexType>& LMSIndices, const std::vector<bool>& isSType)
 {
@@ -1119,6 +1146,7 @@ void verifyLMSSubstringsAreSorted(const Alphabet* source, size_t sourceLen, cons
 	}
 }
 
+//only for debugging
 template <class Alphabet, class IndexType>
 void verifyLMSSuffixesAreSorted(const Alphabet* source, size_t sourceLen, const std::vector<IndexType>& LMSIndices)
 {
@@ -1429,8 +1457,6 @@ void bwtInFiles(const std::string& sourceFile, size_t maxAlphabet, size_t maxMem
 	bwtInFiles<Alphabet>(sourceFile, sourceLen, maxAlphabet, maxMemory, destFile, true);
 }
 
-extern void bwt(const char* source, size_t sourceLen, char* dest);
-
 template <class Alphabet, class IndexType>
 void inverseBWT(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Alphabet* dest)
 {
@@ -1481,7 +1507,5 @@ void inverseBWT(const Alphabet* source, size_t sourceLen, size_t maxAlphabet, Al
 		inverseBWT<Alphabet, size_t>(source, sourceLen, maxAlphabet, dest);
 	}
 }
-
-extern void inverseBWT(const char* source, size_t sourceLen, char* dest);
 
 #endif
