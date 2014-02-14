@@ -17,8 +17,9 @@ echo "making 250 Mb genome"
 tr -cd 'ATCGN' < hg19.fa | head -c 250000000 > genome250
 echo "making 500 Mb genome"
 tr -cd 'ATCGN' < hg19.fa | head -c 500000000 > genome500
-echo "removing big .fa file"
+echo "removing big genome files"
 rm hg19.fa
+rm hg19.2bit
 echo "removing twoBitToFa"
 rm twoBitToFa
 echo "downloading wikiquote dump"
