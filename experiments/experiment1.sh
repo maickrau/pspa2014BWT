@@ -1,8 +1,10 @@
 #!/bin/sh
 
+mkdir /tmp/bwttmp
+
 runInFileTest(){
-	/usr/bin/time -f "%U %S" ./bwt -f -M $2 -i $1 -o tmpout.out
-	rm tmpout.out
+	/usr/bin/time -f "%U %S" ./bwt -f -M $2 -i $1 -o /tmp/bwttmp/bwtout.tmp
+	rm /tmp/bwttmp/bwtout.tmp
 }
 
 runTestsWithMemories(){
